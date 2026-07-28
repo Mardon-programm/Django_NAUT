@@ -1,0 +1,348 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DjangoNAUT - Web IDE</title>
+    <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}">
+
+    <!-- ── xterm.js (terminal) ─────────────────────────────────────────── -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+
+    <!-- ── Our VS Code theme styles ────────────────────────────────────── -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  LAYOUT: Activity Bar | Sidebar | Editor + Terminal                    -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+
+<div id="app">
+
+    <!-- ── Activity Bar (left icons) ───────────────────────────────────── -->
+    <aside id="activity-bar">
+        <div class="activity-icon active" data-panel="explorer" title="Explorer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+        </div>
+        <div class="activity-icon" data-panel="search" title="Search">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+        </div>
+        <div class="activity-icon" data-panel="ai-tests" title="AI Test Generator">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+        </div>
+        <div class="activity-icon" data-panel="docker" title="Docker">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M6 16v2a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2"/>
+            </svg>
+        </div>
+        <div class="activity-icon" data-panel="api-client" title="API Client">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+            </svg>
+        </div>
+        <div class="activity-spacer"></div>
+        <div class="activity-icon" data-panel="settings" title="Settings">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+        </div>
+    </aside>
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+    <aside id="sidebar">
+
+        <!-- Explorer panel -->
+        <div id="panel-explorer" class="sidebar-panel active">
+            <div class="sidebar-header">
+                <span>EXPLORER</span>
+                <div class="sidebar-actions">
+                    <button id="btn-new-file" title="New File">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                        </svg>
+                    </button>
+                    <button id="btn-new-folder" title="New Folder">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                            <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-header" id="folder-header">
+                    <span id="folder-name">No folder opened</span>
+                    <button id="btn-open-folder" class="sidebar-btn" title="Open Folder">Open</button>
+                </div>
+                <div id="file-tree" class="file-tree"></div>
+            </div>
+        </div>
+
+        <!-- Search panel -->
+        <div id="panel-search" class="sidebar-panel">
+            <div class="sidebar-header"><span>SEARCH</span></div>
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Search in files..." autocomplete="off">
+                <div class="search-options">
+                    <label><input type="checkbox" id="search-case"> Match Case</label>
+                    <label><input type="checkbox" id="search-regex"> Regex</label>
+                </div>
+                <div id="search-results" class="search-results"></div>
+            </div>
+        </div>
+
+        <!-- AI Tests panel -->
+        <div id="panel-ai-tests" class="sidebar-panel">
+            <div class="sidebar-header">
+                <span>AI TEST GENERATOR</span>
+                <div class="sidebar-actions">
+                    <button id="btn-ai-save" title="Save to file" style="display:none">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-section" style="padding: 12px;">
+                <div class="ai-info">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    <p>AI will scan your Django project (models, views, urls, serializers) and generate pytest tests.</p>
+                </div>
+                <div class="ai-status" id="ai-status"></div>
+                <button id="btn-ai-generate" class="sidebar-btn" style="width:100%; margin-top: 8px; padding: 6px;">
+                    Generate Tests
+                </button>
+                <div id="ai-files-list" class="ai-files-list"></div>
+                <div id="ai-output" class="ai-output"></div>
+            </div>
+        </div>
+
+        <!-- Docker panel -->
+        <div id="panel-docker" class="sidebar-panel">
+            <div class="sidebar-header">
+                <span>DOCKER</span>
+                <div class="sidebar-actions">
+                    <button id="btn-docker-refresh" title="Refresh">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-section" style="padding: 12px;">
+                <div class="docker-container-input">
+                    <input type="text" id="docker-container-id" placeholder="Container ID or name..." autocomplete="off" style="width:100%; padding:6px 8px; background:var(--bg-3); border:1px solid var(--border); color:var(--text); border-radius:3px; font-size:12px;">
+                </div>
+                <div style="display:flex; gap:4px; margin-top:8px;">
+                    <button id="btn-docker-logs" class="sidebar-btn" style="flex:1">Logs</button>
+                    <button id="btn-docker-status" class="sidebar-btn" style="flex:1">Status</button>
+                </div>
+                <div id="docker-output" class="ai-output" style="margin-top:8px;"></div>
+            </div>
+        </div>
+
+        <!-- API Client panel -->
+        <div id="panel-api-client" class="sidebar-panel">
+            <div class="sidebar-header">
+                <span>API CLIENT</span>
+                <div class="sidebar-actions">
+                    <button id="btn-api-history" title="History">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-section" style="padding: 12px;">
+                <div style="display:flex; gap:4px; margin-bottom:8px;">
+                    <select id="api-method" style="width:80px; padding:6px; background:var(--bg-3); border:1px solid var(--border); color:var(--text); border-radius:3px; font-size:12px;">
+                        <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+                    </select>
+                    <input type="text" id="api-url" placeholder="https://api.example.com/..." autocomplete="off" style="flex:1; padding:6px 8px; background:var(--bg-3); border:1px solid var(--border); color:var(--text); border-radius:3px; font-size:12px;">
+                </div>
+                <div class="settings-group">
+                    <label>Headers (JSON)</label>
+                    <textarea id="api-headers" rows="3" style="width:100%; padding:6px 8px; background:var(--bg-3); border:1px solid var(--border); color:var(--text); border-radius:3px; font-size:11px; font-family:var(--font-mono); resize:vertical;">{}</textarea>
+                </div>
+                <div class="settings-group">
+                    <label>Body</label>
+                    <textarea id="api-body" rows="4" style="width:100%; padding:6px 8px; background:var(--bg-3); border:1px solid var(--border); color:var(--text); border-radius:3px; font-size:11px; font-family:var(--font-mono); resize:vertical;"></textarea>
+                </div>
+                <button id="btn-api-send" class="sidebar-btn" style="width:100%; padding:6px;">Send Request</button>
+                <div id="api-response" class="ai-output" style="margin-top:8px;"></div>
+                <div id="api-history-list" style="margin-top:12px; display:none;"></div>
+            </div>
+        </div>
+
+        <!-- Settings panel -->
+        <div id="panel-settings" class="sidebar-panel">
+            <div class="sidebar-header"><span>SETTINGS</span></div>
+            <div class="settings-panel-content">
+                <div class="settings-group">
+                    <label>Theme</label>
+                    <select id="theme-select">
+                        <option value="vs-dark">Dark+ (Default)</option>
+                        <option value="monokai">Monokai</option>
+                        <option value="solarized-dark">Solarized Dark</option>
+                        <option value="dracula">Dracula</option>
+                        <option value="one-dark">One Dark</option>
+                        <option value="github-dark">GitHub Dark</option>
+                        <option value="vs">Light+</option>
+                    </select>
+                </div>
+                <div class="settings-group">
+                    <label>Font Size</label>
+                    <select id="fontsize-select">
+                        <option value="12">12px</option>
+                        <option value="13">13px</option>
+                        <option value="14" selected>14px</option>
+                        <option value="16">16px</option>
+                        <option value="18">18px</option>
+                        <option value="20">20px</option>
+                    </select>
+                </div>
+                <div class="settings-group">
+                    <label>Tab Size</label>
+                    <select id="tabsize-select">
+                        <option value="2">2 spaces</option>
+                        <option value="4" selected>4 spaces</option>
+                        <option value="8">8 spaces</option>
+                    </select>
+                </div>
+                <div class="settings-group">
+                    <label><input type="checkbox" id="wordwrap-check" checked> Word Wrap</label>
+                </div>
+                <div class="settings-group">
+                    <label><input type="checkbox" id="minimap-check" checked> Minimap</label>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ── Main content area ───────────────────────────────────────────── -->
+    <main id="main-content">
+
+        <!-- Tab bar -->
+        <div id="tab-bar">
+            <div class="tab-welcome active" id="tab-welcome">Welcome</div>
+        </div>
+
+        <!-- Editor area (Monaco Editor mounts here) -->
+        <div id="editor-area">
+            <div id="welcome-screen">
+                <div class="welcome-logo">
+                    <img src="{% static 'images/logo.png' %}" alt="DjangoNAUT" style="width:80px; height:auto;">
+                </div>
+                <h1>DjangoNAUT</h1>
+                <p>Open a folder to start editing, or create a new file.</p>
+                <div class="welcome-shortcuts">
+                    <div><kbd>Ctrl+O</kbd> Open Folder</div>
+                    <div><kbd>Ctrl+S</kbd> Save File</div>
+                    <div><kbd>Ctrl+`</kbd> Toggle Terminal</div>
+                    <div><kbd>Ctrl+P</kbd> Quick Open File</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resizable divider between editor and terminal -->
+        <div id="resize-handle"></div>
+
+        <!-- Bottom panel: Terminal -->
+        <div id="bottom-panel">
+            <div class="panel-tabs">
+                <div class="panel-tab active" data-bpanel="terminal">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+                    </svg>
+                    Terminal
+                    <span id="terminal-status" class="status-dot disconnected"></span>
+                </div>
+                <div class="panel-tab" data-bpanel="output">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    </svg>
+                    Output
+                </div>
+                <div class="panel-actions">
+                    <button id="btn-clear-terminal" title="Clear Terminal">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="bpanel-terminal" class="panel-content active">
+                <div id="terminal-container"></div>
+            </div>
+            <div id="bpanel-output" class="panel-content">
+                <div id="output-log"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- ── Status Bar ──────────────────────────────────────────────────────────── -->
+<footer id="status-bar">
+    <div class="status-left">
+        <span class="status-item branch" id="status-branch">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/>
+                <path d="M6 21V9a9 9 0 0 0 9 9"/>
+            </svg>
+            <span id="branch-name">--</span>
+        </span>
+    </div>
+    <div class="status-right">
+        <span class="status-item" id="status-cursor">Ln 1, Col 1</span>
+        <span class="status-item" id="status-filetype">Plain Text</span>
+        <span class="status-item" id="status-encoding">UTF-8</span>
+        <span class="status-item" id="status-space">Spaces: 4</span>
+        <span class="status-item" id="status-errors">0 errors</span>
+        <span class="status-item" id="status-warnings">0 warnings</span>
+    </div>
+</footer>
+
+<!-- ── Context Menu ──────────────────────────────────────────────────────── -->
+<div id="context-menu">
+    <div class="ctx-item" data-action="open">Open</div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" data-action="rename">Rename</div>
+    <div class="ctx-item" data-action="delete">Delete</div>
+</div>
+
+<!-- ── Quick Open (Ctrl+P) ───────────────────────────────────────────────── -->
+<div id="quick-open">
+    <input type="text" id="quick-open-input" placeholder="Search files..." autocomplete="off">
+    <div id="quick-open-list"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  SCRIPTS                                                                -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Monaco Editor loader -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+
+<!-- xterm.js -->
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+
+<!-- Our editor JS -->
+<script src="{% static 'js/editor.js' %}"></script>
+
+</body>
+</html>

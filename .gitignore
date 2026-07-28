@@ -1,0 +1,6 @@
+node_modules/
+nul
+*.exe
+django_editor_v1/
+django_editor_v2/
+.env

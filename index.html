@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://127.0.0.1:* ws://127.0.0.1:*
+                 https://*.jsdelivr.net https://*.cdnjs.cloudflare.com
+                 https://api.groq.com;
+                 script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:
+                 https://*.jsdelivr.net https://*.cdnjs.cloudflare.com;
+                 connect-src 'self' 'unsafe-inline' data: blob: http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*
+                 https://*.jsdelivr.net https://*.cdnjs.cloudflare.com
+                 https://api.groq.com;">
+  <title>DjangoNAUT</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="toast-container" id="toast-container"></div>
+    <div class="vscode">
+
+    <!-- Activity Bar -->
+    <div class="activity-bar">
+      <div class="activity-bar-top">
+        <button class="activity-icon active" data-panel="explorer" title="Explorer (Ctrl+Shift+E)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="django" title="Django">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>
+            <path d="M8 12h8M12 8v8"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="bughunter" title="Bug Hunter">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="aitests" title="AI Test Generator">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <path d="M9 13l2 2 4-4"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="search" title="Search (Ctrl+Shift+F)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="ai" title="AI Assistant (Ctrl+Shift+A)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="docker" title="Docker">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="6" width="20" height="12" rx="2"/>
+            <path d="M6 6V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/>
+            <path d="M2 10h20"/>
+            <path d="M10 10v4M14 10v4M18 10v4"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="apiclient" title="API Client">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+            <line x1="4" y1="22" x2="4" y2="15"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="deploy" title="Deploy">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="activity-bar-bottom">
+        <button class="activity-icon" id="btn-settings" title="Settings (Ctrl+,)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+
+      <!-- Explorer Panel -->
+      <div class="sidebar-panel active" id="panel-explorer">
+        <div class="sidebar-header">
+          <span>EXPLORER</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-new-file" title="New File">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+            </button>
+            <button id="btn-open-folder" title="Open Folder">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-header" id="folder-name">No folder open</div>
+        </div>
+        <div class="sidebar-body" id="file-tree"></div>
+      </div>
+
+      <!-- Django Panel -->
+      <div class="sidebar-panel" id="panel-django">
+        <div class="sidebar-header">
+          <span>DJANGO</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-create-project" title="New Django Project">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-body" id="django-tree">
+          <div class="django-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>
+              <path d="M8 12h8M12 8v8"/>
+            </svg>
+            <p>Open a Django project to explore its structure.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bug Hunter Panel -->
+      <div class="sidebar-panel" id="panel-bughunter">
+        <div class="sidebar-header">
+          <span>BUG HUNTER</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-scan" title="Scan Project">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-body" id="bug-list">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <p>Click scan to analyze your project.</p>
+          </div>
+        </div>
+        <div class="bug-summary hidden" id="bug-summary"></div>
+      </div>
+
+      <!-- AI Test Generator Panel -->
+      <div class="sidebar-panel" id="panel-aitests">
+        <div class="sidebar-header">
+          <span>AI TEST GENERATOR</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-aitests-save" title="Save tests to file" style="display:none">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-body" id="aitests-body" style="padding: 12px;">
+          <div class="bug-empty" id="aitests-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M9 13l2 2 4-4"/>
+            </svg>
+            <p>Generate pytest tests for your Django project using AI.</p>
+          </div>
+          <button id="btn-aitests-generate" class="btn-primary" style="width:100%;margin:8px 0;">Generate Tests</button>
+          <div id="aitests-status" style="font-size:12px;margin-bottom:8px;"></div>
+          <div id="aitests-files" style="font-size:11px;color:var(--text-dim);"></div>
+          <pre id="aitests-output" style="background:var(--bg-3);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:11px;font-family:var(--font-mono);overflow:auto;max-height:400px;white-space:pre;color:var(--text);display:none;margin-top:8px;"></pre>
+        </div>
+      </div>
+
+      <!-- Search Panel -->
+      <div class="sidebar-panel" id="panel-search">
+        <div class="sidebar-header"><span>SEARCH</span></div>
+        <div class="sidebar-body">
+          <div class="search-box">
+            <input type="text" placeholder="Search in files..." id="search-input">
+            <div class="search-options">
+              <label class="search-option"><input type="checkbox" id="search-case" title="Match Case"> Aa</label>
+              <label class="search-option"><input type="checkbox" id="search-regex" title="Regex"> .*</label>
+            </div>
+          </div>
+          <div id="search-results"></div>
+        </div>
+      </div>
+
+      <!-- AI Panel -->
+      <div class="sidebar-panel" id="panel-ai">
+        <div class="ai-tabs">
+          <button class="ai-tab active" data-aitab="analyze">Analyze</button>
+          <button class="ai-tab" data-aitab="architect">Architect</button>
+          <button class="ai-tab" data-aitab="memory">Memory</button>
+        </div>
+        <div class="ai-chat" id="ai-chat">
+          <div class="ai-welcome">
+            <div class="ai-welcome-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </div>
+            <p class="ai-welcome-title" id="ai-welcome-title">AI Code Analyzer</p>
+            <p class="ai-welcome-desc" id="ai-welcome-desc">Ask about your code and get expert Django advice.</p>
+          </div>
+        </div>
+        <div class="ai-input-area">
+          <textarea class="ai-input" id="ai-input" placeholder="Ask AI..." rows="2"></textarea>
+          <button class="ai-send-btn" id="ai-send-btn" title="Send (Enter)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Docker Panel -->
+      <div class="sidebar-panel" id="panel-docker">
+        <div class="sidebar-header">
+          <span>DOCKER</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-docker-refresh" title="Refresh">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="docker-toolbar">
+          <button class="docker-action-btn" id="btn-docker-run" title="Run container">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run
+          </button>
+          <button class="docker-action-btn" id="btn-docker-build" title="Build image">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Build
+          </button>
+        </div>
+        <div class="docker-section-header">Containers</div>
+        <div class="docker-containers-scroll" id="docker-containers">
+          <div class="docker-empty">Click refresh to load containers.</div>
+        </div>
+        <div class="docker-section-header">Images</div>
+        <div class="docker-images-scroll" id="docker-images">
+          <div class="docker-empty">Click refresh to load images.</div>
+        </div>
+      </div>
+
+      <!-- API Client Panel -->
+      <div class="sidebar-panel" id="panel-apiclient">
+        <div class="sidebar-header"><span>API CLIENT</span></div>
+        <div class="api-request-section">
+          <div class="api-request-bar">
+            <select class="api-method-select" id="api-method">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option>
+              <option value="DELETE">DELETE</option>
+              <option value="HEAD">HEAD</option>
+              <option value="OPTIONS">OPTIONS</option>
+            </select>
+            <input type="text" class="api-url-input" id="api-url" placeholder="https://api.example.com/endpoint" spellcheck="false">
+            <button class="api-send-btn" id="api-send-btn" title="Send request (Ctrl+Enter)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+          <div class="api-tabs">
+            <button class="api-tab active" data-apitab="headers">Headers</button>
+            <button class="api-tab" data-apitab="body">Body</button>
+          </div>
+          <div class="api-tab-content active" id="api-tab-headers">
+            <div id="api-headers-list">
+              <div class="api-kv-row">
+                <input type="text" class="api-kv-key" placeholder="Key" value="Content-Type">
+                <input type="text" class="api-kv-value" placeholder="Value" value="application/json">
+                <button class="api-kv-remove">&times;</button>
+              </div>
+            </div>
+            <button class="api-kv-add" id="api-add-header">+ Add header</button>
+          </div>
+          <div class="api-tab-content" id="api-tab-body">
+            <textarea class="api-body-editor" id="api-body" placeholder='{"key": "value"}' rows="4" spellcheck="false"></textarea>
+          </div>
+        </div>
+        <div class="api-response-area" id="api-response-area">
+          <div class="api-response-header">
+            <div class="api-response-tabs">
+              <button class="api-resp-tab active" data-resptab="body">Body</button>
+              <button class="api-resp-tab" data-resptab="headers">Headers</button>
+              <button class="api-resp-tab" data-resptab="raw">Raw</button>
+            </div>
+            <span class="api-response-meta" id="api-response-meta"></span>
+          </div>
+          <div class="api-response-body" id="api-response-body">
+            <div class="api-empty-response">Send a request to see the response.</div>
+          </div>
+          <div class="api-response-body hidden" id="api-response-headers"></div>
+          <div class="api-response-body hidden" id="api-response-raw"></div>
+        </div>
+      </div>
+
+      <!-- Deploy Panel -->
+      <div class="sidebar-panel" id="panel-deploy">
+        <div class="sidebar-header">
+          <span>DEPLOY</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-deploy-check" title="Run deployment checks">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-body" id="deploy-checks">
+          <div class="deploy-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            <p>Click the check button to analyze deployment readiness.</p>
+          </div>
+        </div>
+        <div class="deploy-summary hidden" id="deploy-summary"></div>
+      </div>
+    </div>
+
+    <!-- Resize handle -->
+    <div class="resize-handle" id="resize-sidebar"></div>
+
+    <!-- Main area -->
+    <div class="main-area">
+
+      <!-- Tab Bar -->
+      <div class="tab-bar" id="tab-bar">
+        <div class="tab welcome-tab active" data-tab="welcome">Welcome</div>
+      </div>
+
+      <!-- Editor -->
+      <div class="editor-area" id="editor-area">
+        <div class="welcome" id="welcome-msg">
+          <div class="welcome-logo"><img src="logo.png" alt="DjangoNAUT" style="width:80px;height:auto;"></div>
+          <h1>DjangoNAUT</h1>
+          <p>Open a folder or create a Django project to get started.</p>
+          <div class="welcome-shortcuts">
+            <div class="shortcut"><kbd>Ctrl+O</kbd><span>Open Folder</span></div>
+            <div class="shortcut"><kbd>Ctrl+S</kbd><span>Save File</span></div>
+            <div class="shortcut"><kbd>Ctrl+`</kbd><span>Terminal</span></div>
+            <div class="shortcut"><kbd>Ctrl+P</kbd><span>Quick Open</span></div>
+            <div class="shortcut"><kbd>Ctrl+Shift+P</kbd><span>Command Palette</span></div>
+            <div class="shortcut"><kbd>Ctrl+Shift+E</kbd><span>Explorer</span></div>
+            <div class="shortcut"><kbd>Ctrl+Shift+A</kbd><span>AI Assistant</span></div>
+            <div class="shortcut"><kbd>Ctrl+G</kbd><span>Go to Line</span></div>
+          </div>
+        </div>
+        <div class="image-preview" id="image-preview" style="display:none">
+          <img id="preview-img" src="" alt="Preview">
+        </div>
+      </div>
+
+      <!-- Bottom panel resize -->
+      <div class="resize-handle-h" id="resize-panel"></div>
+
+      <!-- Bottom panel -->
+      <div class="bottom-panel" id="bottom-panel">
+        <div class="panel-tabs">
+          <div class="terminal-tab-bar" id="terminal-tab-bar">
+            <button class="terminal-tab active" data-term="0">Terminal 1</button>
+          </div>
+          <button class="terminal-tab-add" id="terminal-add" title="New Terminal">+</button>
+          <button class="panel-tab" data-bpanel="terminal" id="panel-tab-terminal">Terminal</button>
+          <button class="panel-tab" data-bpanel="output">Output</button>
+          <button class="panel-tab" data-bpanel="problems">Problems <span class="badge" id="problems-badge"></span></button>
+        </div>
+        <div class="panel-content active" id="bpanel-terminal">
+        </div>
+        <div class="panel-content" id="bpanel-output">
+          <div class="terminal-output" id="output-log"></div>
+        </div>
+        <div class="panel-content" id="bpanel-problems">
+          <div id="problems-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="status-left">
+        <span class="status-item status-branch" id="status-branch" title="Click to switch branch">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/>
+            <path d="M6 21V9a9 9 0 0 0 9 9"/>
+          </svg>
+          <span id="branch-name">main</span>
+        </span>
+        <span class="status-item" id="status-errors" title="Errors">0 errors</span>
+        <span class="status-item" id="status-warnings" title="Warnings">0 warnings</span>
+      </div>
+      <div class="status-right">
+        <span class="status-item" id="status-django" title="Django project status">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>
+          </svg>
+          Django
+        </span>
+        <span class="status-item" id="status-python" title="Python version">Python</span>
+        <span class="status-item" id="status-shell" title="Current shell">CMD</span>
+        <span class="status-item" id="status-encoding">UTF-8</span>
+        <span class="status-item" id="status-cursor">Ln 1, Col 1</span>
+        <span class="status-item" id="status-filetype">Plain Text</span>
+        <span class="status-item" id="status-deploy" title="Deploy status">Deploy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div class="context-menu hidden" id="context-menu">
+    <div class="ctx-item" data-action="new-file">
+      <span class="ctx-icon">+</span> New File
+    </div>
+    <div class="ctx-item" data-action="new-folder">
+      <span class="ctx-icon">+</span> New Folder
+    </div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" data-action="rename">
+      <span class="ctx-icon">&#9998;</span> Rename
+    </div>
+    <div class="ctx-item ctx-danger" data-action="delete">
+      <span class="ctx-icon">&#10005;</span> Delete
+    </div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" data-action="copy-path">
+      <span class="ctx-icon">&#128279;</span> Copy Path
+    </div>
+  </div>
+
+  <!-- Command Palette -->
+  <div class="modal-overlay hidden" id="cmdpalette-overlay">
+    <div class="quickopen-box" id="cmdpalette-box">
+      <input type="text" class="quickopen-input" id="cmdpalette-input" placeholder="Type a command..." spellcheck="false" autofocus>
+      <div class="quickopen-results" id="cmdpalette-results"></div>
+    </div>
+  </div>
+
+  <!-- Branch Dropdown -->
+  <div class="branch-dropdown hidden" id="branch-dropdown">
+    <div class="branch-dropdown-header">Switch Branch</div>
+    <div class="branch-dropdown-list" id="branch-list"></div>
+    <div class="branch-dropdown-separator"></div>
+    <div class="branch-dropdown-item" id="branch-git-log">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      View Recent Commits
+    </div>
+  </div>
+
+  <!-- Git Log Popup -->
+  <div class="git-log-popup hidden" id="git-log-popup">
+    <div class="git-log-header">
+      <span>Recent Commits</span>
+      <button class="git-log-close" id="git-log-close">&times;</button>
+    </div>
+    <div class="git-log-list" id="git-log-list"></div>
+  </div>
+
+  <!-- Rename Input -->
+  <div class="rename-input-wrap hidden" id="rename-input-wrap">
+    <input type="text" class="rename-input" id="rename-input" spellcheck="false">
+  </div>
+
+  <div id="modal-container"></div>
+
+  <!-- xterm.js must load BEFORE Monaco Editor loader, which defines global AMD define().
+       If define() exists when xterm.js UMD runs, it goes AMD path instead of setting globals. -->
+  <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css">
+  <script src="node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+  <script>
+    if (typeof Terminal === 'undefined') {
+      console.error('[djangonaut] xterm.js Terminal class not available as global');
+    }
+  </script>
+
+  <!-- Monaco Editor loader (defines global define() - AMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+
+  <script>
+    window._errorQueue = [];
+    window.onerror = function(msg, src, line, col) {
+      window._errorQueue.push('ERROR: ' + msg + ' (' + (src || '').split('/').pop() + ':' + line + ')');
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      window._errorQueue.push('Unhandled: ' + (e.reason && e.reason.message || e.reason));
+    });
+  </script>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
