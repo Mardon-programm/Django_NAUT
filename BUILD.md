@@ -1,10 +1,22 @@
 # Сборка под Linux и macOS
 
+Требования: Node.js 18+, npm.
+
 ## 1. Клонировать и установить
 
 ```bash
 git clone https://github.com/Mardon-programm/Django_NAUT.git
 cd Django_NAUT
+npm install
+```
+
+На WSL (например, Kali Linux) не используйте Windows-версию Node.js из `/mnt/c/`. Установите nvm внутри WSL:
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+nvm install 20
+nvm install-latest-npm
+cd ~/Django_NAUT   # предварительно склонируйте в домашнюю папку WSL
 npm install
 ```
 
