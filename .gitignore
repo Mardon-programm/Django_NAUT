@@ -1,6 +1,8 @@
 node_modules/
-nul
+dist/
 *.exe
+*.pdb
+.ruff_cache/
 django_editor_v1/
 django_editor_v2/
 .env
