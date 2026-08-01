@@ -15,6 +15,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - run: npm ci
       - run: npx electron-builder install-app-deps
       - run: npm run build
@@ -32,6 +35,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - run: npm ci
       - run: npx electron-builder install-app-deps
       - run: npm run build:mac
@@ -51,6 +57,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - run: npm ci
       - run: npx electron-builder install-app-deps
       - run: npm run build:linux
