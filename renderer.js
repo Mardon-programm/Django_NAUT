@@ -4487,10 +4487,106 @@
     el.innerHTML = html;
   }
 
+  // ── Security Scanner ────────────────────────────────────────────────────
+
+  let nautSecurityFindings = [];
+
+  async function nautRefreshSecurity() {
+    if (!currentFolder) return;
+    const el = $('#security-body');
+    if (!el) return;
+    el.innerHTML = '<div class="mig-summary">Scanning for vulnerabilities…</div>';
+    let res;
+    try { res = await window.api.security.scan(currentFolder); } catch (e) { return; }
+    nautSecurityFindings = res.findings || [];
+
+    const s = res.summary || { critical: 0, warning: 0, info: 0, total: 0 };
+    const statusEl = $('#status-security');
+    if (statusEl) {
+      if (s.total > 0) {
+        statusEl.style.display = '';
+        statusEl.style.color = s.critical ? 'var(--red)' : s.warning ? 'var(--yellow)' : 'var(--green)';
+        statusEl.textContent = '\uD83D\uDEE1 ' + s.critical + ' crit \u00B7 ' + s.warning + ' warn';
+        statusEl.onclick = () => switchToPanel('security');
+      } else {
+        statusEl.style.display = 'none';
+      }
+    }
+
+    if (!nautSecurityFindings.length) {
+      el.innerHTML = '<div class="bug-empty"><p style="color:var(--green)">No vulnerabilities found.</p></div>';
+    } else {
+      let html = '<div class="mig-summary">' + s.total + ' findings \u00B7 ' + s.critical + ' critical \u00B7 ' + s.warning + ' warnings \u00B7 ' + s.info + ' info</div>';
+      for (const f of nautSecurityFindings) {
+        const sevCls = f.severity === 'critical' ? 'sec-critical' : f.severity === 'warning' ? 'sec-warning' : 'sec-info';
+        const icon = f.severity === 'critical' ? '\u2716' : f.severity === 'warning' ? '\u26A0' : '\u2139';
+        const shortFile = f.file ? f.file.replace(currentFolder, '').replace(/[/\\]/g, '/').replace(/^\//, '') : '';
+        html += '<div class="sec-item ' + sevCls + '" data-file="' + escapeHtml(f.file) + '" data-line="' + f.line + '">' +
+          '<div class="sec-head"><span class="sec-icon">' + icon + '</span> <b>' + escapeHtml(f.rule) + '</b></div>' +
+          '<div class="sec-msg">' + escapeHtml(f.message) + '</div>' +
+          '<div class="sec-file">' + escapeHtml(shortFile) + ':' + f.line + '</div></div>';
+      }
+      el.innerHTML = html;
+      el.querySelectorAll('.sec-item').forEach((item) => {
+        item.addEventListener('click', () => nautGotoSecurity(item.dataset.file, parseInt(item.dataset.line, 10)));
+      });
+    }
+    nautSecurityProblems(nautSecurityFindings);
+    nautApplySecurityMarkers();
+  }
+
+  function nautSecurityProblems(issues) {
+    if (!problemsList) return;
+    problemsList.querySelectorAll('.naut-security-item').forEach((n) => n.remove());
+    if (!issues || !issues.length) return;
+    const empty = problemsList.querySelector('.problems-empty');
+    if (empty) empty.remove();
+    for (const issue of issues) {
+      const el = document.createElement('div');
+      el.className = 'problem-item naut-security-item';
+      const iconCls = issue.severity === 'critical' ? 'error' : issue.severity === 'warning' ? 'warning' : 'info';
+      const iconChar = issue.severity === 'critical' ? '\u2716' : issue.severity === 'warning' ? '\u26A0' : '\u2139';
+      const shortFile = issue.file ? issue.file.replace(currentFolder || '', '').replace(/^[/\\]/, '') : '';
+      el.innerHTML =
+        '<div class="problem-icon ' + iconCls + '">' + iconChar + '</div>' +
+        '<span class="problem-msg"><span class="naut-sec-tag">Security:</span> ' + escapeHtml(issue.message) + '</span>' +
+        '<span class="problem-file">' + escapeHtml(shortFile) + (issue.line ? ':' + issue.line : '') + '</span>';
+      el.addEventListener('click', () => { if (issue.file) nautGotoSecurity(issue.file, issue.line); });
+      problemsList.appendChild(el);
+    }
+  }
+
+  function nautApplySecurityMarkers() {
+    if (typeof monaco === 'undefined' || !window._monacoEditor) return;
+    const model = window._monacoEditor.getModel();
+    if (!model || !model.uri) return;
+    const modelPath = nautNorm(model.uri.fsPath);
+    const markers = nautSecurityFindings
+      .filter((f) => f.file && nautNorm(f.file) === modelPath)
+      .map((f) => ({
+        severity: f.severity === 'critical' ? monaco.MarkerSeverity.Error : f.severity === 'warning' ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Hint,
+        message: f.message,
+        startLineNumber: f.line, startColumn: 1,
+        endLineNumber: f.line, endColumn: 1000,
+      }));
+    monaco.editor.setModelMarkers(model, 'naut-security', markers);
+  }
+
+  function nautGotoSecurity(file, line) {
+    nautGoto(file, line);
+  }
+
+  (function nautInitSecurityMarkers() {
+    if (typeof monaco !== 'undefined' && window._monacoEditor) {
+      window._monacoEditor.onDidChangeModel(() => nautApplySecurityMarkers());
+      return;
+    }
+    setTimeout(nautInitSecurityMarkers, 700);
+  })();
+
   // ── Scrapbook (Django Notebook) ─────────────────────────────────────────
 
   let scrapbookCells = 0;
-
   function scrapbookAddCell(code) {
     const cells = $('#scrapbook-cells');
     if (!cells) return;
@@ -4665,6 +4761,7 @@
     nautRefreshSignals();
     nautRefreshTasks();
     nautRefreshDeps();
+    nautRefreshSecurity();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -4680,6 +4777,7 @@
   $('#btn-task-scan')?.addEventListener('click', nautRefreshTasks);
   $('#btn-signals-scan')?.addEventListener('click', nautRefreshSignals);
   $('#btn-deps-scan')?.addEventListener('click', nautRefreshDeps);
+  $('#btn-security-scan')?.addEventListener('click', nautRefreshSecurity);
   $('#btn-mock-data')?.addEventListener('click', nautMockData);
   $('#btn-naut-runserver')?.addEventListener('click', nautRunServer);
   $('#btn-naut-install')?.addEventListener('click', nautInstallAgent);

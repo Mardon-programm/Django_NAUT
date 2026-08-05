@@ -2710,3 +2710,39 @@ body {
 .naut-modal .modal-body {
   font-size: 12px;
 }
+
+/* Security Scanner */
+.sec-item {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+  cursor: pointer;
+}
+.sec-item:hover { background: rgba(128,128,128,0.08); }
+.sec-critical { border-left: 3px solid var(--red, #f14c4c); }
+.sec-warning { border-left: 3px solid var(--yellow, #e2c08d); }
+.sec-info { border-left: 3px solid var(--blue, #569cd6); }
+.sec-head {
+  font-size: 11px;
+  color: var(--text);
+  font-family: var(--font-mono, monospace);
+}
+.sec-icon { margin-right: 4px; }
+.sec-critical .sec-icon { color: var(--red, #f14c4c); }
+.sec-warning .sec-icon { color: var(--yellow, #e2c08d); }
+.sec-info .sec-icon { color: var(--blue, #569cd6); }
+.sec-msg {
+  font-size: 11px;
+  color: var(--text-dim, #9aa4af);
+  margin-top: 3px;
+}
+.sec-file {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  margin-top: 3px;
+  font-family: var(--font-mono, monospace);
+}
+.naut-sec-tag {
+  color: var(--yellow, #e2c08d);
+  font-weight: 600;
+  margin-right: 4px;
+}

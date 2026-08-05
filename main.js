@@ -10,6 +10,7 @@ const { runBugHunter } = require('./bughunter');
 const { startTelemetryServer, getState } = require('./telemetry-server');
 const migrationGuard = require('./migration-guard');
 const { scanSignals, getSignalLenses, scanTasks } = require('./agent-scanners');
+const securityScanner = require('./security-scanner');
 const shellRPC = require('./shell-rpc');
 const deps = require('./deps-updater');
 
@@ -1012,6 +1013,10 @@ ipcMain.handle('shell:close', (_e, root) => {
 
 ipcMain.handle('deps:scan', async (_e, root) => {
   return deps.scanDeps(root);
+});
+
+ipcMain.handle('security:scan', (_e, root) => {
+  return securityScanner.scanSecurity(root);
 });
 
 ipcMain.handle('ai:mockdata', async (_e, { apiKey, model, scanData, amount }) => {

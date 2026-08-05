@@ -95,6 +95,12 @@
             <path d="M12 7.5V12m0 0l-4.5 5m4.5-5l4.5 5"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="security" title="Security Scanner">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </button>
       </div>
       <div class="activity-bar-bottom">
         <button class="activity-icon" id="btn-settings" title="Settings (Ctrl+,)">
@@ -466,6 +472,30 @@
           </div>
         </div>
       </div>
+
+      <!-- Security Panel -->
+      <div class="sidebar-panel" id="panel-security">
+        <div class="sidebar-header">
+          <span>SECURITY</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-security-scan" title="Scan for vulnerabilities">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-body" id="security-body">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+            <p>Static analysis: SECRET_KEY, DEBUG, raw SQL, eval/exec, CSRF, unsafe templates.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Resize handle -->
@@ -552,6 +582,7 @@
         <span class="status-item" id="status-warnings" title="Warnings">0 warnings</span>
         <span class="status-item" id="status-migration" title="Migration conflicts" style="display:none"></span>
         <span class="status-item" id="status-telemetry" title="SQL telemetry"></span>
+        <span class="status-item" id="status-security" title="Security findings" style="display:none"></span>
       </div>
       <div class="status-right">
         <span class="status-item" id="status-django" title="Django project status">
