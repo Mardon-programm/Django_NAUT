@@ -11,6 +11,7 @@ const { startTelemetryServer, getState } = require('./telemetry-server');
 const migrationGuard = require('./migration-guard');
 const { scanSignals, getSignalLenses, scanTasks } = require('./agent-scanners');
 const securityScanner = require('./security-scanner');
+const testRunner = require('./test-runner');
 const shellRPC = require('./shell-rpc');
 const deps = require('./deps-updater');
 
@@ -1017,6 +1018,14 @@ ipcMain.handle('deps:scan', async (_e, root) => {
 
 ipcMain.handle('security:scan', (_e, root) => {
   return securityScanner.scanSecurity(root);
+});
+
+ipcMain.handle('test:scan', (_e, root) => {
+  return { tests: testRunner.scanTests(root) };
+});
+
+ipcMain.handle('test:run', async (_e, { root, target }) => {
+  return testRunner.runTests(root, target);
 });
 
 ipcMain.handle('ai:mockdata', async (_e, { apiKey, model, scanData, amount }) => {

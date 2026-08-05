@@ -4584,6 +4584,104 @@
     setTimeout(nautInitSecurityMarkers, 700);
   })();
 
+  // ── Test Runner ─────────────────────────────────────────────────────────
+
+  const nautTests = { list: [] };
+  const nautTestStatus = {};
+
+  async function nautRefreshTests() {
+    if (!currentFolder) return;
+    const el = $('#tests-body');
+    if (!el) return;
+    let res;
+    try { res = await window.api.tests.scan(currentFolder); } catch (e) { return; }
+    nautTests.list = res.tests || [];
+    nautRenderTests();
+  }
+
+  function nautRenderTests() {
+    const el = $('#tests-body');
+    if (!el) return;
+    const list = nautTests.list || [];
+    if (!list.length) {
+      el.innerHTML = '<div class="bug-empty"><p>No tests found (test_*.py / *_test.py).</p></div>';
+      return;
+    }
+    const byFile = {};
+    for (const t of list) (byFile[t.rel] = byFile[t.rel] || []).push(t);
+    let html = '<div class="mig-summary">' + list.length + ' tests</div>';
+    for (const rel of Object.keys(byFile)) {
+      html += '<div class="mig-app">' + escapeHtml(rel) +
+        ' <button class="test-run-file" data-target="' + escapeHtml(rel) + '" title="Run this file">Run file</button></div>';
+      for (const t of byFile[rel]) {
+        const st = nautTestStatus[t.nodeId];
+        const icon = st === 'passed'
+          ? '<span class="test-ok">\u2713</span>'
+          : st === 'failed' || st === 'error'
+            ? '<span class="test-fail">\u2716</span>'
+            : st === 'running'
+              ? '<span class="test-run">\u2026</span>'
+              : '<span class="test-idle">\u00B7</span>';
+        html += '<div class="test-item" data-file="' + escapeHtml(t.file) + '" data-line="' + t.line + '">' +
+          '<span class="test-icon">' + icon + '</span>' +
+          '<span class="test-name">' + escapeHtml(t.className ? t.className + '.' + t.name : t.name) + '</span>' +
+          '<span class="test-loc">:' + t.line + '</span>' +
+          '<button class="test-run-btn" data-target="' + escapeHtml(t.nodeId) + '" title="Run test">Run</button></div>';
+      }
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.test-item').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        if (e.target.classList.contains('test-run-btn')) return;
+        nautGoto(item.dataset.file, parseInt(item.dataset.line, 10));
+      });
+    });
+    el.querySelectorAll('.test-run-btn').forEach((btn) => {
+      btn.addEventListener('click', () => nautRunTests(btn.dataset.target));
+    });
+    el.querySelectorAll('.test-run-file').forEach((btn) => {
+      btn.addEventListener('click', () => nautRunTests(btn.dataset.target));
+    });
+  }
+
+  async function nautRunTests(target) {
+    if (!currentFolder) { showToast('Open a folder first', 'warning'); return; }
+    const key = target || '';
+    for (const t of nautTests.list || []) {
+      if (!key || t.nodeId === key || key === t.rel) nautTestStatus[t.nodeId] = 'running';
+    }
+    nautRenderTests();
+    const label = key || 'All tests';
+    outputPrint(label + ' \u2192 running\u2026', 'out-info');
+    let res;
+    try {
+      res = await window.api.tests.run({ root: currentFolder, target: key });
+    } catch (e) {
+      res = { passed: 0, failed: 0, errors: 1, error: e.message, output: e.message };
+    }
+    const failedIds = res.failedIds || [];
+    for (const t of nautTests.list || []) {
+      if (failedIds.includes(t.nodeId)) nautTestStatus[t.nodeId] = 'failed';
+      else if (!key || t.nodeId === key || key === t.rel) nautTestStatus[t.nodeId] = 'passed';
+    }
+    nautRenderTests();
+
+    const summary = (res.framework || 'test') + ': ' + res.passed + ' passed, ' + res.failed + ' failed, ' + res.errors + ' errors' + (res.skipped ? ', ' + res.skipped + ' skipped' : '');
+    outputPrint(summary, (res.failed || res.errors) ? 'line-stderr' : 'out-success');
+    if (res.output) {
+      outputPrint('\u2500'.repeat(60), 'out-info');
+      const lines = res.output.split('\n').filter((l) => /FAILED|ERROR|Traceback|^E\s|AssertionError|Error/.test(l));
+      outputPrint(lines.slice(-40).join('\n'), 'line-stderr');
+    }
+    if (res.failed || res.errors) {
+      const first = nautTests.list.find((t) => failedIds.includes(t.nodeId));
+      if (first) nautGoto(first.file, first.line);
+      showToast(summary, 'error');
+    } else {
+      showToast(summary, 'success');
+    }
+  }
+
   // ── Scrapbook (Django Notebook) ─────────────────────────────────────────
 
   let scrapbookCells = 0;
@@ -4762,6 +4860,7 @@
     nautRefreshTasks();
     nautRefreshDeps();
     nautRefreshSecurity();
+    nautRefreshTests();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -4778,6 +4877,8 @@
   $('#btn-signals-scan')?.addEventListener('click', nautRefreshSignals);
   $('#btn-deps-scan')?.addEventListener('click', nautRefreshDeps);
   $('#btn-security-scan')?.addEventListener('click', nautRefreshSecurity);
+  $('#btn-test-scan')?.addEventListener('click', nautRefreshTests);
+  $('#btn-test-run-all')?.addEventListener('click', () => nautRunTests(''));
   $('#btn-mock-data')?.addEventListener('click', nautMockData);
   $('#btn-naut-runserver')?.addEventListener('click', nautRunServer);
   $('#btn-naut-install')?.addEventListener('click', nautInstallAgent);

@@ -131,6 +131,11 @@ contextBridge.exposeInMainWorld('api', {
     scan: (root) => ipcRenderer.invoke('security:scan', root),
   },
 
+  tests: {
+    scan: (root) => ipcRenderer.invoke('test:scan', root),
+    run: (opts) => ipcRenderer.invoke('test:run', opts),
+  },
+
   mockdata: {
     generate: (opts) => ipcRenderer.invoke('ai:mockdata', opts),
   },

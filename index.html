@@ -101,6 +101,12 @@
             <path d="M9 12l2 2 4-4"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="tests" title="Test Runner">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        </button>
       </div>
       <div class="activity-bar-bottom">
         <button class="activity-icon" id="btn-settings" title="Settings (Ctrl+,)">
@@ -493,6 +499,35 @@
               <path d="M9 12l2 2 4-4"/>
             </svg>
             <p>Static analysis: SECRET_KEY, DEBUG, raw SQL, eval/exec, CSRF, unsafe templates.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test Runner Panel -->
+      <div class="sidebar-panel" id="panel-tests">
+        <div class="sidebar-header">
+          <span>TESTS</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-test-run-all" title="Run all tests">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 3l14 9-14 9V3z"/>
+              </svg>
+            </button>
+            <button id="btn-test-scan" title="Scan tests">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-body" id="tests-body">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <p>Discover and run pytest / manage.py test from the IDE.</p>
           </div>
         </div>
       </div>
