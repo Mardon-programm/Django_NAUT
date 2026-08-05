@@ -2798,3 +2798,43 @@ body {
   margin-left: 6px;
 }
 .test-run-file:hover { border-color: var(--accent); }
+
+/* Performance Profiler */
+.prof-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+.prof-table th {
+  text-align: left;
+  padding: 3px 6px;
+  color: var(--text-dim, #9aa4af);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.prof-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+  font-family: var(--font-mono, monospace);
+}
+.prof-view {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+}
+.prof-hot td { color: var(--red, #f14c4c); }
+.prof-warm td { color: var(--yellow, #e2c08d); }
+.prof-sql {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+  cursor: pointer;
+}
+.prof-sql:hover { background: rgba(128,128,128,0.08); }
+.prof-sql code {
+  color: var(--text);
+  word-break: break-all;
+}

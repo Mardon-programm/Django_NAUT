@@ -4143,7 +4143,7 @@
     }
     const el = $('#status-telemetry');
     if (el) {
-      const total = (payload.queries || []).length;
+      const total = payload.totalQueries != null ? payload.totalQueries : (payload.queries || []).length;
       const warn = total > 50 || payload.totalTime > 1000;
       el.style.color = warn ? 'var(--red)' : 'var(--green)';
       el.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/></svg> ${total} SQL${warn ? ' ⚠' : ''}`;
@@ -4192,8 +4192,10 @@
 
   function nautOnTelemetry(payload) {
     if (!payload) return;
-    if (payload.kind === 'sql') ingestSql(payload);
-    else if (payload.kind === 'error') handleNautError(payload);
+    if (payload.kind === 'sql') {
+      ingestSql(payload);
+      nautProfilerIngest(payload);
+    } else if (payload.kind === 'error') handleNautError(payload);
     refreshCodeLenses();
   }
 
@@ -4584,6 +4586,114 @@
     setTimeout(nautInitSecurityMarkers, 700);
   })();
 
+  // ── Performance Profiler ────────────────────────────────────────────────
+
+  let nautProfViews = {};
+  let nautProfSlowQueries = [];
+  const nautProfSlowThreshold = 200;
+  let nautProfTimer = null;
+
+  function nautProfilerIngest(payload) {
+    const qs = payload.queries || [];
+    const view = payload.view || payload.path || '?';
+    const reqMs = payload.requestTime || 0;
+    const v = nautProfViews[view] || { count: 0, totalMs: 0, maxMs: 0, queries: 0 };
+    v.count++;
+    v.totalMs += reqMs;
+    v.maxMs = Math.max(v.maxMs, reqMs);
+    v.queries += qs.length;
+    nautProfViews[view] = v;
+    for (const q of qs) {
+      if ((q.time || 0) >= nautProfSlowThreshold) {
+        nautProfSlowQueries.push({
+          time: q.time, sql: q.sql, view,
+          file: q.stack && q.stack.file, line: q.stack && q.stack.line,
+        });
+      }
+    }
+    if (nautProfSlowQueries.length > 100) nautProfSlowQueries = nautProfSlowQueries.slice(-100);
+    nautScheduleProfilerRender();
+  }
+
+  function nautScheduleProfilerRender() {
+    if (nautProfTimer) return;
+    nautProfTimer = setTimeout(() => {
+      nautProfTimer = null;
+      nautRefreshProfiler();
+    }, 400);
+  }
+
+  function nautResetProfiler() {
+    nautProfViews = {};
+    nautProfSlowQueries = [];
+    nautRefreshProfiler();
+  }
+
+  function nautRefreshProfiler() {
+    const el = $('#profiler-body');
+    if (!el) return;
+    const views = Object.keys(nautProfViews).map((v) => ({
+      view: v,
+      ...nautProfViews[v],
+      avg: +(nautProfViews[v].totalMs / nautProfViews[v].count).toFixed(1),
+    })).sort((a, b) => b.totalMs - a.totalMs).slice(0, 12);
+
+    const slow = nautProfSlowQueries.slice().sort((a, b) => b.time - a.time).slice(0, 12);
+
+    const statusEl = $('#status-profiler');
+    if (statusEl) {
+      const total = views.reduce((a, v) => a + v.count, 0);
+      const avg = total ? (views.reduce((a, v) => a + v.totalMs, 0) / total).toFixed(1) : 0;
+      if (total) {
+        statusEl.style.display = '';
+        statusEl.textContent = '\u23F1 ' + avg + 'ms avg';
+        statusEl.onclick = () => switchToPanel('profiler');
+      } else {
+        statusEl.style.display = 'none';
+      }
+    }
+
+    if (!views.length) {
+      el.innerHTML = '<div class="bug-empty"><p style="color:var(--text-dim)">No requests captured yet.</p>' +
+        '<p style="font-size:11px;color:var(--text-dim)">Start the dev server with \u25B6 Run server + telemetry, then open pages in the browser.</p></div>';
+      return;
+    }
+
+    let html = '<div class="mig-summary">' +
+      views.reduce((a, v) => a + v.count, 0) + ' requests \u00B7 ' +
+      (slow.length ? slow.length + ' slow queries (\u2265' + nautProfSlowThreshold + 'ms)' : 'no slow queries') +
+      '</div>';
+
+    html += '<div class="mig-section-title">Top views by total time</div>';
+    html += '<table class="prof-table"><thead><tr><th>View</th><th>#</th><th>avg</th><th>max</th><th>total</th><th>SQL</th></tr></thead><tbody>';
+    for (const v of views) {
+      const cls = v.avg > 300 ? 'prof-hot' : v.avg > 150 ? 'prof-warm' : '';
+      html += '<tr class="' + cls + '"><td class="prof-view">' + escapeHtml(v.view) + '</td>' +
+        '<td>' + v.count + '</td><td>' + v.avg + 'ms</td><td>' + v.maxMs + 'ms</td>' +
+        '<td>' + v.totalMs.toFixed(0) + 'ms</td><td>' + v.queries + '</td></tr>';
+    }
+    html += '</tbody></table>';
+
+    if (slow.length) {
+      html += '<div class="mig-section-title" style="color:var(--yellow)">Slowest queries</div>';
+      for (const q of slow) {
+        const loc = q.file ? (q.file.split(/[/\\]/).pop() + ':' + q.line) : '';
+        html += '<div class="prof-sql" data-file="' + escapeHtml(q.file || '') + '" data-line="' + (q.line || 0) + '">' +
+          '<span class="scrapbook-sql-time">' + q.time + 'ms</span> ' +
+          '<code>' + escapeHtml((q.sql || '').replace(/\s+/g, ' ').slice(0, 120)) + '</code>' +
+          (loc ? '<div class="sec-file">' + escapeHtml(loc) + '</div>' : '') +
+          '</div>';
+      }
+    }
+
+    el.innerHTML = html;
+    el.querySelectorAll('.prof-sql').forEach((item) => {
+      item.addEventListener('click', () => {
+        if (item.dataset.file) nautGoto(item.dataset.file, parseInt(item.dataset.line, 10) || 1);
+      });
+    });
+  }
+
   // ── Test Runner ─────────────────────────────────────────────────────────
 
   const nautTests = { list: [] };
@@ -4843,8 +4953,8 @@
     if (!currentFolder) return;
     const st = await window.api.telemetry.getState();
     const port = st.port || 0;
-    executeCommand('python manage.py runserver_naut --naut-port ' + port);
-    showToast('runserver_naut started in terminal (telemetry port ' + port + ')', 'success');
+    executeCommand('python -m django_naut runserver --naut-port ' + port);
+    showToast('django_naut runserver started in terminal (telemetry port ' + port + ')', 'success');
   }
 
   async function nautAfterFolderOpen() {
@@ -4861,6 +4971,7 @@
     nautRefreshDeps();
     nautRefreshSecurity();
     nautRefreshTests();
+    nautResetProfiler();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -4879,6 +4990,8 @@
   $('#btn-security-scan')?.addEventListener('click', nautRefreshSecurity);
   $('#btn-test-scan')?.addEventListener('click', nautRefreshTests);
   $('#btn-test-run-all')?.addEventListener('click', () => nautRunTests(''));
+  $('#btn-profiler-scan')?.addEventListener('click', nautRefreshProfiler);
+  $('#btn-profiler-reset')?.addEventListener('click', nautResetProfiler);
   $('#btn-mock-data')?.addEventListener('click', nautMockData);
   $('#btn-naut-runserver')?.addEventListener('click', nautRunServer);
   $('#btn-naut-install')?.addEventListener('click', nautInstallAgent);

@@ -57,6 +57,7 @@ class DjangoNautMiddleware(MiddlewareMixin):
         queries = []
         client = get_client()
         project = _get_project()
+        request_start = time.perf_counter()
 
         def wrapper(execute, sql, params, many, context):
             start = time.perf_counter()
@@ -79,29 +80,30 @@ class DjangoNautMiddleware(MiddlewareMixin):
             self._report_error(request, exc)
             raise
 
-        if queries:
-            path = getattr(request, "path", "")
-            method = getattr(request, "method", "")
-            view = None
-            try:
-                view = getattr(request, "resolver_match", None)
-                if view:
-                    view = getattr(view, "func", None)
-                    view = getattr(view, "__name__", None) or getattr(view, "view_class", None).__name__
-            except Exception:
-                pass
-            client.send(
-                "sql",
-                {
-                    "project": project,
-                    "path": path,
-                    "method": method,
-                    "view": view,
-                    "queries": queries,
-                    "totalQueries": len(queries),
-                    "totalTime": round(sum(q["time"] for q in queries), 2),
-                },
-            )
+        request_time = round((time.perf_counter() - request_start) * 1000, 2)
+        path = getattr(request, "path", "")
+        method = getattr(request, "method", "")
+        view = None
+        try:
+            view = getattr(request, "resolver_match", None)
+            if view:
+                view = getattr(view, "func", None)
+                view = getattr(view, "__name__", None) or getattr(view, "view_class", None).__name__
+        except Exception:
+            pass
+        client.send(
+            "sql",
+            {
+                "project": project,
+                "path": path,
+                "method": method,
+                "view": view,
+                "queries": queries,
+                "totalQueries": len(queries),
+                "requestTime": request_time,
+                "totalTime": round(sum(q["time"] for q in queries), 2),
+            },
+        )
         return response
 
     def _report_error(self, request, exc):
