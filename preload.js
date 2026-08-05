@@ -135,6 +135,12 @@ contextBridge.exposeInMainWorld('api', {
     scan: (root) => ipcRenderer.invoke('security:scan', root),
   },
 
+  cache: {
+    inspect: (root) => ipcRenderer.invoke('cache:inspect', root),
+    delete: (opts) => ipcRenderer.invoke('cache:delete', opts),
+    clear: (opts) => ipcRenderer.invoke('cache:clear', opts),
+  },
+
   tests: {
     scan: (root) => ipcRenderer.invoke('test:scan', root),
     run: (opts) => ipcRenderer.invoke('test:run', opts),

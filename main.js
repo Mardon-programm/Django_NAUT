@@ -14,6 +14,7 @@ const securityScanner = require('./security-scanner');
 const testRunner = require('./test-runner');
 const shellRPC = require('./shell-rpc');
 const deps = require('./deps-updater');
+const cacheInspector = require('./cache-inspector');
 
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-compositing');
@@ -1078,6 +1079,24 @@ ipcMain.handle('deps:scan', async (_e, root) => {
 
 ipcMain.handle('security:scan', (_e, root) => {
   return securityScanner.scanSecurity(root);
+});
+
+ipcMain.handle('cache:inspect', async (_e, root) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(cacheInspector.inspectCode());
+});
+
+ipcMain.handle('cache:delete', async (_e, { root, alias, key }) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(cacheInspector.deleteCode(alias, key));
+});
+
+ipcMain.handle('cache:clear', async (_e, { root, alias }) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(cacheInspector.clearCode(alias));
 });
 
 ipcMain.handle('test:scan', (_e, root) => {

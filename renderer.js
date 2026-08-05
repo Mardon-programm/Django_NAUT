@@ -4971,6 +4971,7 @@
     nautRefreshSecurity();
     nautRefreshTests();
     nautResetProfiler();
+    nautRefreshCache();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -5148,6 +5149,132 @@
     set('#log-count-requests', _logState.counts.request || 0);
   }
 
+  // ── Cache Inspector ────────────────────────────────────────────────────
+
+  let _cacheSnapshot = {};
+
+  async function nautRefreshCache() {
+    if (!currentFolder) return;
+    const body = $('#cache-body');
+    if (!body) return;
+    body.innerHTML = '<div class="bug-empty"><p>Inspecting cache…</p></div>';
+    let res;
+    try { res = await window.api.cache.inspect(currentFolder); } catch (e) {
+      body.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>';
+      return;
+    }
+    if (!res || !res.ok) {
+      body.innerHTML = '<div class="bug-empty"><p>' + escapeHtml((res && res.error) || 'Cache inspect failed') + '</p></div>';
+      return;
+    }
+    _cacheSnapshot = (res.result && typeof res.result === 'object') ? res.result : {};
+    const sel = $('#cache-alias');
+    if (sel) {
+      const aliases = Object.keys(_cacheSnapshot);
+      const cur = sel.value;
+      sel.innerHTML = aliases.map((a) => '<option value="' + escapeHtml(a) + '">' + escapeHtml(a) + '</option>').join('');
+      if (aliases.indexOf(cur) !== -1) sel.value = cur;
+    }
+    nautRenderCache();
+  }
+
+  function nautCurrentCacheAlias() {
+    const sel = $('#cache-alias');
+    const aliases = Object.keys(_cacheSnapshot);
+    const v = sel ? sel.value : '';
+    return aliases.indexOf(v) !== -1 ? v : (aliases[0] || '');
+  }
+
+  function nautRenderCache() {
+    const body = $('#cache-body');
+    if (!body) return;
+    const alias = nautCurrentCacheAlias();
+    const d = _cacheSnapshot[alias];
+    if (!d) {
+      body.innerHTML = '<div class="bug-empty"><p>No cache data. Click refresh.</p></div>';
+      return;
+    }
+    let html = '<div class="cache-summary">';
+    html += '<div class="cache-summary-line"><b>' + escapeHtml(d.backend || '?') + '</b> <span class="cache-badge">' + escapeHtml(d.type || '') + '</span></div>';
+    if (d.location) html += '<div class="cache-summary-sub">' + escapeHtml(String(d.location)) + '</div>';
+    const stats = [];
+    if (typeof d.hits === 'number') stats.push('hits ' + d.hits);
+    if (typeof d.misses === 'number') stats.push('misses ' + d.misses);
+    if (d.hitRate !== undefined) stats.push('hit rate ' + d.hitRate + '%');
+    if (d.entryCount !== undefined) stats.push(d.entryCount + ' entries');
+    if (d.dbsize !== undefined) stats.push('db size ' + d.dbsize);
+    if (d.servers && d.servers.length) stats.push(d.servers.length + ' server(s)');
+    if (stats.length) html += '<div class="cache-summary-sub">' + escapeHtml(stats.join(' · ')) + '</div>';
+    html += '</div>';
+
+    const keys = d.keys || [];
+    if (!keys.length) {
+      html += '<div class="bug-empty"><p>No keys found' + (d.note ? ' — ' + escapeHtml(d.note) : '') + '.</p></div>';
+    } else {
+      html += '<div class="cache-section-title">Keys (' + keys.length + ' shown' +
+        (d.entryCount !== undefined && d.entryCount > keys.length ? ' of ' + d.entryCount : '') + ')</div>';
+      const canDel = d.type === 'locmem' || d.type === 'redis' || d.type === 'database';
+      for (const k of keys) {
+        html += '<div class="cache-key">' +
+          '<div class="cache-key-name">' + escapeHtml(k.key) +
+          (k.ttl != null ? ' <span class="cache-ttl">ttl ' + k.ttl + 's</span>' : '') + '</div>' +
+          (k.value ? '<div class="cache-key-value">' + escapeHtml(k.value) + '</div>' : '') +
+          (canDel ? '<button class="cache-del-btn" data-alias="' + escapeHtml(alias) + '" data-key="' + escapeHtml(k.key) + '" title="Delete key">✕</button>' : '') +
+          '</div>';
+      }
+    }
+
+    if (d.servers && d.servers.length) {
+      for (const s of d.servers) {
+        const info = Object.entries(s).filter(([k2]) => k2 !== 'server');
+        if (!info.length) continue;
+        html += '<div class="cache-section-title">' + escapeHtml(s.server) + '</div>';
+        html += '<div class="cache-stats">' + info.map(([k2, v2]) => '<div class="cache-stat"><span>' + escapeHtml(k2) + '</span><b>' + escapeHtml(String(v2)) + '</b></div>').join('') + '</div>';
+      }
+    }
+
+    body.innerHTML = html;
+    if (d.error) {
+      const er = document.createElement('div');
+      er.className = 'cache-error';
+      er.textContent = 'Error: ' + d.error;
+      body.appendChild(er);
+    }
+    body.querySelectorAll('.cache-del-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        nautDeleteCacheKey(btn.dataset.alias, btn.dataset.key, btn);
+      });
+    });
+  }
+
+  async function nautDeleteCacheKey(alias, key, btn) {
+    if (!currentFolder) return;
+    if (!confirm('Delete cache key: ' + key + ' ?')) return;
+    btn.disabled = true;
+    try {
+      const res = await window.api.cache.delete({ root: currentFolder, alias, key });
+      if (res && res.ok) { showToast('Cache key deleted', 'success'); nautRefreshCache(); }
+      else showToast((res && res.error) || 'Delete failed', 'error');
+    } catch (e) {
+      showToast('Delete error: ' + e.message, 'error');
+    }
+  }
+
+  async function nautClearCache() {
+    if (!currentFolder) return;
+    const alias = nautCurrentCacheAlias();
+    if (!alias) return;
+    if (!confirm('Clear the "' + alias + '" cache entirely?')) return;
+    try {
+      const res = await window.api.cache.clear({ root: currentFolder, alias });
+      if (res && res.ok) { showToast('Cache "' + alias + '" cleared', 'success'); nautRefreshCache(); }
+      else showToast((res && res.error) || 'Clear failed', 'error');
+    } catch (e) {
+      showToast('Clear error: ' + e.message, 'error');
+    }
+  }
+
   // ── Wire up ─────────────────────────────────────────────────────────────
 
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
@@ -5166,6 +5293,9 @@
   $('#btn-log-clear')?.addEventListener('click', nautLogClear);
   $('#log-search')?.addEventListener('input', nautLogFullRender);
   $('#log-level')?.addEventListener('change', nautLogFullRender);
+  $('#btn-cache-scan')?.addEventListener('click', nautRefreshCache);
+  $('#btn-cache-clear')?.addEventListener('click', nautClearCache);
+  $('#cache-alias')?.addEventListener('change', nautRenderCache);
   $('#btn-mock-data')?.addEventListener('click', nautMockData);
   $('#btn-naut-runserver')?.addEventListener('click', nautRunServer);
   $('#btn-naut-install')?.addEventListener('click', nautInstallAgent);

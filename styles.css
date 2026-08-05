@@ -2913,3 +2913,99 @@ body {
 .log-line-loc { cursor: pointer; }
 .log-line-loc .log-line-text { text-decoration: underline; text-decoration-style: dotted; }
 .log-line-loc:hover { background: rgba(128,128,128,0.08); }
+
+/* Cache Inspector */
+.cache-toolbar {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.cache-toolbar select#cache-alias {
+  width: 100%;
+  background: var(--bg-dark, #1a1a1a);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.cache-summary {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(128,128,128,0.05);
+}
+.cache-summary-line { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.cache-summary-sub {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  margin-top: 2px;
+}
+.cache-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(41,184,219,0.15);
+  color: var(--cyan, #29b8db);
+  text-transform: uppercase;
+}
+.cache-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim, #9aa4af);
+  padding: 8px 10px 4px;
+}
+.cache-key {
+  position: relative;
+  padding: 4px 10px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+  cursor: default;
+}
+.cache-key:hover { background: rgba(128,128,128,0.05); }
+.cache-key-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text);
+  word-break: break-all;
+  padding-right: 22px;
+}
+.cache-key-value {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  word-break: break-all;
+  margin-top: 2px;
+  font-family: var(--font-mono, monospace);
+}
+.cache-ttl {
+  color: var(--yellow, #e2c08d);
+  font-size: 9px;
+  margin-left: 4px;
+}
+.cache-del-btn {
+  position: absolute;
+  right: 6px;
+  top: 4px;
+  background: none;
+  border: none;
+  color: var(--red, #f14c4c);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  opacity: 0;
+}
+.cache-key:hover .cache-del-btn { opacity: 1; }
+.cache-del-btn:hover { background: rgba(241,76,76,0.15); }
+.cache-stats { padding: 0 10px 6px; }
+.cache-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(128,128,128,0.06);
+}
+.cache-stat span { color: var(--text-dim, #9aa4af); }
+.cache-stat b { font-weight: 600; font-family: var(--font-mono, monospace); }
+.cache-error {
+  padding: 8px 10px;
+  color: var(--red, #f14c4c);
+  font-size: 10px;
+}

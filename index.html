@@ -107,6 +107,13 @@
             <polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="cache" title="Cache Inspector">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2L20 6v4L12 14 4 10V6l8-4z"/>
+            <path d="M4 14l8 4 8-4"/>
+            <path d="M4 18l8 4 8-4"/>
+          </svg>
+        </button>
         <button class="activity-icon" data-panel="profiler" title="Performance Profiler">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
@@ -569,6 +576,39 @@
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
             </svg>
             <p>Live request timing from runserver_naut telemetry.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cache Inspector Panel -->
+      <div class="sidebar-panel" id="panel-cache">
+        <div class="sidebar-header">
+          <span>CACHE</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-cache-clear" title="Clear active cache alias">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+              </svg>
+            </button>
+            <button id="btn-cache-scan" title="Refresh">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="cache-toolbar">
+          <select id="cache-alias" title="Cache alias"></select>
+        </div>
+        <div class="sidebar-body" id="cache-body">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M12 2L20 6v4L12 14 4 10V6l8-4z"/>
+              <path d="M4 14l8 4 8-4"/>
+              <path d="M4 18l8 4 8-4"/>
+            </svg>
+            <p>Cache backend stats and keys from settings.CACHES.</p>
           </div>
         </div>
       </div>
