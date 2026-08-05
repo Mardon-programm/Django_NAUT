@@ -2838,3 +2838,78 @@ body {
   color: var(--text);
   word-break: break-all;
 }
+
+/* Live Log Viewer */
+.log-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.log-toolbar input#log-search {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-dark, #1a1a1a);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 3px 6px;
+  font-size: 11px;
+}
+.log-toolbar select#log-level {
+  background: var(--bg-dark, #1a1a1a);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 3px 4px;
+}
+.log-autoscroll {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.log-counts {
+  display: flex;
+  gap: 8px;
+  padding: 3px 8px;
+  font-size: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.log-count { padding: 1px 6px; border-radius: 8px; background: rgba(128,128,128,0.12); color: var(--text-dim); }
+.log-count-errors { color: var(--red, #f14c4c); background: rgba(241,76,76,0.12); }
+.log-count-warnings { color: var(--yellow, #e2c08d); background: rgba(226,192,141,0.12); }
+.log-count-requests { color: var(--cyan, #29b8db); background: rgba(41,184,219,0.12); }
+.log-body {
+  padding: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  overflow-y: auto;
+}
+.log-line {
+  display: flex;
+  gap: 6px;
+  padding: 1px 8px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border-bottom: 1px solid rgba(128,128,128,0.05);
+}
+.log-line-time {
+  flex: none;
+  color: var(--text-dim, #9aa4af);
+  opacity: 0.8;
+}
+.log-line-text { flex: 1; color: var(--text); }
+.log-error .log-line-text { color: var(--red, #f14c4c); }
+.log-warn .log-line-text { color: var(--yellow, #e2c08d); }
+.log-request .log-line-text { color: var(--cyan, #29b8db); }
+.log-debug .log-line-text { color: var(--text-dim, #9aa4af); }
+.log-line-loc { cursor: pointer; }
+.log-line-loc .log-line-text { text-decoration: underline; text-decoration-style: dotted; }
+.log-line-loc:hover { background: rgba(128,128,128,0.08); }

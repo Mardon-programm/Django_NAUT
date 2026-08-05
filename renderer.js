@@ -4951,10 +4951,9 @@
 
   async function nautRunServer() {
     if (!currentFolder) return;
+    if (_logState.running) { nautLogStopServer(); return; }
     const st = await window.api.telemetry.getState();
-    const port = st.port || 0;
-    executeCommand('python -m django_naut runserver --naut-port ' + port);
-    showToast('django_naut runserver started in terminal (telemetry port ' + port + ')', 'success');
+    nautLogStartServer(st.port || 0);
   }
 
   async function nautAfterFolderOpen() {
@@ -4979,9 +4978,180 @@
     } catch (e) {}
   }
 
+  // ── Live Log Viewer ─────────────────────────────────────────────────────
+
+  const _logState = {
+    ws: null,
+    ready: false,
+    running: false,
+    lines: [],
+    maxLines: 4000,
+    renderTimer: null,
+    scrollAtBottom: true,
+    counts: { error: 0, warn: 0, request: 0, info: 0, debug: 0 },
+  };
+
+  function connectLogSocket() {
+    return window.api.logs.getPort().then((port) => {
+      if (!port || _logState.ws) return;
+      _logState.ws = new WebSocket('ws://127.0.0.1:' + port);
+      _logState.ws.onopen = () => {
+        _logState.ready = true;
+        _logState.ws.send(JSON.stringify({ type: 'status' }));
+      };
+      _logState.ws.onmessage = (evt) => {
+        let msg;
+        try { msg = JSON.parse(evt.data); } catch { return; }
+        if (msg.type === 'line') {
+          nautLogIngest(msg.data);
+        } else if (msg.type === 'status') {
+          nautLogSetRunning(!!(msg.data && msg.data.running));
+        } else if (msg.type === 'exit') {
+          nautLogSetRunning(false);
+        }
+      };
+      _logState.ws.onclose = () => { _logState.ready = false; };
+      _logState.ws.onerror = () => { _logState.ready = false; };
+    }).catch(() => {});
+  }
+
+  function nautLogSetRunning(running) {
+    _logState.running = running;
+    const toggle = $('#btn-log-toggle');
+    if (toggle) {
+      toggle.title = running ? 'Stop server' : 'Start server';
+      toggle.style.color = running ? 'var(--green, #23d18b)' : '';
+    }
+    const statusEl = $('#status-log');
+    if (statusEl) {
+      statusEl.style.display = running ? '' : 'none';
+      statusEl.style.color = running ? 'var(--green, #23d18b)' : '';
+      statusEl.textContent = running ? '● Server running' : '';
+      statusEl.onclick = () => switchToPanel('logs');
+    }
+  }
+
+  function nautLogStartServer(port) {
+    if (!_logState.ws || _logState.ws.readyState !== 1) {
+      connectLogSocket().then(() => setTimeout(() => nautLogStartServer(port), 200));
+      return;
+    }
+    _logState.ws.send(JSON.stringify({
+      type: 'start',
+      data: { cwd: currentFolder, nautPort: port || 0, addr: '127.0.0.1:8000' },
+    }));
+    showToast('Server starting… logs stream in Live Logs panel', 'success');
+    switchToPanel('logs');
+  }
+
+  function nautLogStopServer() {
+    if (_logState.ws && _logState.ws.readyState === 1) _logState.ws.send(JSON.stringify({ type: 'stop' }));
+    nautLogSetRunning(false);
+    showToast('Server stopped', 'info');
+  }
+
+  function nautLogToggle() {
+    if (_logState.running) nautLogStopServer();
+    else nautLogStartServer(0);
+  }
+
+  function nautLogFilterValue() {
+    const sel = $('#log-level');
+    return sel ? sel.value : 'all';
+  }
+
+  function nautLogSearchValue() {
+    const input = $('#log-search');
+    return input ? input.value.trim().toLowerCase() : '';
+  }
+
+  function nautLogPasses(line) {
+    const f = nautLogFilterValue();
+    if (f !== 'all' && line.level !== f) return false;
+    const q = nautLogSearchValue();
+    if (q && line.text.toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  }
+
+  function nautLogTime(ts) {
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  }
+
+  function nautLogExtractLoc(text) {
+    const m = text.match(/File "([^"]+)", line (\d+)/);
+    if (m) return { file: m[1], line: parseInt(m[2], 10) };
+    return null;
+  }
+
+  function nautLogLineEl(line) {
+    const el = document.createElement('div');
+    el.className = 'log-line log-' + line.level;
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'log-line-time';
+    timeSpan.textContent = nautLogTime(line.time);
+    el.appendChild(timeSpan);
+    const textEl = document.createElement('span');
+    textEl.className = 'log-line-text';
+    textEl.textContent = line.text;
+    el.appendChild(textEl);
+    const loc = nautLogExtractLoc(line.text);
+    if (loc) {
+      el.classList.add('log-line-loc');
+      el.title = 'Go to ' + loc.file + ':' + loc.line;
+      el.addEventListener('click', () => nautGoto(loc.file, loc.line));
+    }
+    return el;
+  }
+
+  function nautLogIngest(data) {
+    if (!data || !data.text) return;
+    const line = { time: data.time || Date.now(), level: data.level || 'info', text: data.text };
+    _logState.lines.push(line);
+    if (_logState.lines.length > _logState.maxLines) _logState.lines.splice(0, _logState.lines.length - _logState.maxLines);
+    _logState.counts[line.level] = (_logState.counts[line.level] || 0) + 1;
+    nautLogUpdateCounts();
+    const out = $('#log-output');
+    if (out && nautLogPasses(line)) {
+      _logState.scrollAtBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 60;
+      out.appendChild(nautLogLineEl(line));
+      while (out.childElementCount > _logState.maxLines) out.firstChild.remove();
+      if (_logState.scrollAtBottom || ($('#log-autoscroll') && $('#log-autoscroll').checked)) out.scrollTop = out.scrollHeight;
+    }
+  }
+
+  function nautLogFullRender() {
+    const out = $('#log-output');
+    if (!out) return;
+    _logState.scrollAtBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 60;
+    const frag = document.createDocumentFragment();
+    for (const line of _logState.lines) {
+      if (nautLogPasses(line)) frag.appendChild(nautLogLineEl(line));
+    }
+    out.innerHTML = '';
+    out.appendChild(frag);
+    if (_logState.scrollAtBottom || ($('#log-autoscroll') && $('#log-autoscroll').checked)) out.scrollTop = out.scrollHeight;
+  }
+
+  function nautLogClear() {
+    _logState.lines = [];
+    _logState.counts = { error: 0, warn: 0, request: 0, info: 0, debug: 0 };
+    nautLogUpdateCounts();
+    nautLogFullRender();
+  }
+
+  function nautLogUpdateCounts() {
+    const set = (id, v) => { const el = $(id); if (el) el.textContent = String(v); };
+    set('#log-count-errors', _logState.counts.error || 0);
+    set('#log-count-warnings', _logState.counts.warn || 0);
+    set('#log-count-requests', _logState.counts.request || 0);
+  }
+
   // ── Wire up ─────────────────────────────────────────────────────────────
 
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
+  connectLogSocket();
 
   $('#btn-migration-scan')?.addEventListener('click', nautRefreshMigrations);
   $('#btn-task-scan')?.addEventListener('click', nautRefreshTasks);
@@ -4992,6 +5162,10 @@
   $('#btn-test-run-all')?.addEventListener('click', () => nautRunTests(''));
   $('#btn-profiler-scan')?.addEventListener('click', nautRefreshProfiler);
   $('#btn-profiler-reset')?.addEventListener('click', nautResetProfiler);
+  $('#btn-log-toggle')?.addEventListener('click', nautLogToggle);
+  $('#btn-log-clear')?.addEventListener('click', nautLogClear);
+  $('#log-search')?.addEventListener('input', nautLogFullRender);
+  $('#log-level')?.addEventListener('change', nautLogFullRender);
   $('#btn-mock-data')?.addEventListener('click', nautMockData);
   $('#btn-naut-runserver')?.addEventListener('click', nautRunServer);
   $('#btn-naut-install')?.addEventListener('click', nautInstallAgent);

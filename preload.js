@@ -90,6 +90,10 @@ contextBridge.exposeInMainWorld('api', {
     getPort: () => ipcRenderer.invoke('terminal:getPort'),
   },
 
+  logs: {
+    getPort: () => ipcRenderer.invoke('logs:getPort'),
+  },
+
   telemetry: {
     getState: () => ipcRenderer.invoke('telemetry:getState'),
     onEvent: (callback) => {

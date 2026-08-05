@@ -41,10 +41,19 @@ app.whenReady().then(async () => {
   await startTerminalServer();
 
   // DjangoNAUT agent location (python-agent) for shell RPC
+  let agentDir;
   if (app.isPackaged) {
-    shellRPC.setAgentDir(path.join(process.resourcesPath, 'python-agent'));
+    agentDir = path.join(process.resourcesPath, 'python-agent');
   } else {
-    shellRPC.setAgentDir(path.join(__dirname, 'python-agent'));
+    agentDir = path.join(__dirname, 'python-agent');
+  }
+  shellRPC.setAgentDir(agentDir);
+
+  // Live Log Viewer: spawns the Django dev server and streams its output
+  try {
+    await startLogServer(agentDir);
+  } catch (err) {
+    console.error('[logs] failed to start:', err.message);
   }
 
   // Telemetry listener: Python agent posts SQL/error events here
@@ -316,6 +325,57 @@ function startTerminalServer() {
 }
 
 ipcMain.handle('terminal:getPort', () => terminalPort);
+
+// ── Live Log Server (Django runserver output stream) ───────────────────────
+
+let logPort = 0;
+
+function startLogServer(agentDir) {
+  return new Promise((resolve, reject) => {
+    let serverPath;
+    if (app.isPackaged) {
+      serverPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'log-server.js');
+    } else {
+      serverPath = path.join(__dirname, 'log-server.js');
+    }
+    const child = spawn(process.execPath, [serverPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        DJANGONAUT_AGENT_DIR: agentDir,
+      },
+    });
+
+    let portData = '';
+    child.stdout.on('data', (chunk) => {
+      portData += chunk.toString();
+      if (!logPort) {
+        const parsed = parseInt(portData, 10);
+        if (parsed > 0) {
+          logPort = parsed;
+          console.log('[logs] live log server started on port', logPort);
+          resolve(logPort);
+        }
+      }
+    });
+
+    child.stderr.on('data', (chunk) => {
+      process.stderr.write('[log-server] ' + chunk.toString());
+    });
+
+    child.on('error', (err) => {
+      console.error('[logs] failed to start server:', err.message);
+      reject(err);
+    });
+
+    child.on('exit', (code) => {
+      console.log('[logs] live log server exited with code', code);
+    });
+  });
+}
+
+ipcMain.handle('logs:getPort', () => logPort);
 
 // ── System ─────────────────────────────────────────────────────────────────
 

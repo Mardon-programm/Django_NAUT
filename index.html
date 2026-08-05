@@ -112,6 +112,14 @@
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="logs" title="Live Logs">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="7" y1="8" x2="17" y2="8"/>
+            <line x1="7" y1="12" x2="17" y2="12"/>
+            <line x1="7" y1="16" x2="13" y2="16"/>
+          </svg>
+        </button>
       </div>
       <div class="activity-bar-bottom">
         <button class="activity-icon" id="btn-settings" title="Settings (Ctrl+,)">
@@ -171,7 +179,7 @@
           </div>
         </div>
         <div class="naut-telemetry-bar">
-          <button id="btn-naut-runserver" title="Start `python -m django_naut runserver` in the terminal (SQL telemetry + error interceptor)">▶ Run server + telemetry</button>
+          <button id="btn-naut-runserver" title="Start Django server via Live Logs (SQL telemetry + error interceptor + live output)">▶ Run server + telemetry</button>
           <button id="btn-naut-install" title="pip install -e python-agent">⚙ Install Agent</button>
           <span id="naut-port-label" class="naut-port-label">Port: —</span>
           <span id="agent-status" class="naut-port-label"></span>
@@ -564,6 +572,53 @@
           </div>
         </div>
       </div>
+
+      <!-- Live Logs Panel -->
+      <div class="sidebar-panel" id="panel-logs">
+        <div class="sidebar-header">
+          <span>LIVE LOGS</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-log-toggle" title="Start / stop server">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+            </button>
+            <button id="btn-log-clear" title="Clear log">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="log-toolbar">
+          <input id="log-search" type="text" placeholder="Filter…" spellcheck="false">
+          <select id="log-level" title="Minimum level to show">
+            <option value="all">All</option>
+            <option value="error">Errors</option>
+            <option value="warn">Warnings</option>
+            <option value="info">Info</option>
+            <option value="request">Requests</option>
+            <option value="debug">Debug</option>
+          </select>
+          <label class="log-autoscroll" title="Auto-scroll to newest line">
+            <input type="checkbox" id="log-autoscroll" checked> Auto
+          </label>
+        </div>
+        <div class="log-counts">
+          <span class="log-count log-count-errors" id="log-count-errors" title="Errors">0</span>
+          <span class="log-count log-count-warnings" id="log-count-warnings" title="Warnings">0</span>
+          <span class="log-count log-count-requests" id="log-count-requests" title="Requests">0</span>
+        </div>
+        <div class="sidebar-body log-body" id="log-output">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            <p>Start the Django server to stream logs here.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Resize handle -->
@@ -651,6 +706,7 @@
         <span class="status-item" id="status-migration" title="Migration conflicts" style="display:none"></span>
         <span class="status-item" id="status-telemetry" title="SQL telemetry"></span>
         <span class="status-item" id="status-profiler" title="Average request time" style="display:none"></span>
+        <span class="status-item" id="status-log" title="Live log server" style="display:none"></span>
         <span class="status-item" id="status-security" title="Security findings" style="display:none"></span>
       </div>
       <div class="status-right">
