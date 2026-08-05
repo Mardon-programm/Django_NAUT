@@ -293,6 +293,8 @@
     clearTimeout(watcherRefreshTimer);
     watcherRefreshTimer = setTimeout(function () {
       refreshFileTree();
+      const fn = String(data.filename || '').toLowerCase();
+      if (fn.includes('migration') || fn.endsWith('.py')) nautRefreshMigrations();
     }, 800);
   });
 
@@ -1044,6 +1046,7 @@
           glyphMargin: true,
           folding: true,
           bracketPairColorization: { enabled: true },
+          codeLens: true,
           suggest: {
             showKeywords: true,
             showSnippets: true,
@@ -2231,6 +2234,7 @@
       $('#status-django').innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/></svg> Django`;
       buildDjangoManagementButtons();
     }
+    nautAfterFolderOpen();
   }
 
   async function createProject() {
@@ -4076,4 +4080,630 @@
     await refreshFileTree();
     outputPrint('Tests saved to: ' + name, 'out-success');
   }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // DjangoNAUT Agent Features
+  // ════════════════════════════════════════════════════════════════════════
+
+  // ── State ───────────────────────────────────────────────────────────────
+
+  const nautSqlLenses = {};        // file -> line -> {queries, time, queries: [sql]}
+  const nautSignalLenses = {};     // file -> [{line, model, total, save, delete, signals}]
+  let nautLastError = null;
+  let codeLensDisposable = null;
+  let nautTelemetryPort = 0;
+
+  const nautNorm = (p) => String(p || '').replace(/\\/g, '/');
+  const nautModel = () => localStorage.getItem('groq_model') || 'llama-3.3-70b-versatile';
+
+  // ── Generic modal ───────────────────────────────────────────────────────
+
+  function nautModal(title, bodyHtml) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML =
+      '<div class="modal naut-modal" style="min-width:480px;max-width:720px">' +
+      '<div class="modal-header"><span>' + escapeHtml(title) + '</span>' +
+      '<button class="modal-close">&times;</button></div>' +
+      '<div class="modal-body" style="max-height:70vh;overflow:auto">' + bodyHtml + '</div></div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('.modal-close').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    return overlay;
+  }
+
+  // ── Telemetry: SQL ingestion ───────────────────────────────────────────
+
+  function ingestSql(payload) {
+    const byFile = {};
+    for (const q of payload.queries || []) {
+      if (q.stack && q.stack.file) {
+        const file = nautNorm(q.stack.file);
+        if (!byFile[file]) byFile[file] = {};
+        const line = q.stack.line;
+        if (!byFile[file][line]) byFile[file][line] = { queries: 0, time: 0, sqls: [] };
+        const e = byFile[file][line];
+        e.queries++;
+        e.time += q.time || 0;
+        if (e.sqls.length < 20) e.sqls.push({ sql: q.sql, time: q.time });
+      }
+    }
+    for (const file of Object.keys(byFile)) {
+      if (!nautSqlLenses[file]) nautSqlLenses[file] = {};
+      for (const line of Object.keys(byFile[file])) {
+        const e = byFile[file][line];
+        nautSqlLenses[file][line] = {
+          queries: e.queries,
+          time: +e.time.toFixed(1),
+          sqls: e.sqls,
+          view: payload.view,
+          path: payload.path,
+        };
+      }
+    }
+    const el = $('#status-telemetry');
+    if (el) {
+      const total = (payload.queries || []).length;
+      const warn = total > 50 || payload.totalTime > 1000;
+      el.style.color = warn ? 'var(--red)' : 'var(--green)';
+      el.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/></svg> ${total} SQL${warn ? ' ⚠' : ''}`;
+    }
+  }
+
+  // ── Error Interceptor ───────────────────────────────────────────────────
+
+  function nautMarkError(file, line) {
+    if (typeof monaco === 'undefined' || !window._monacoEditor) return;
+    const model = window._monacoEditor.getModel();
+    if (!model) return;
+    const msg = nautLastError ? nautLastError.exception + ': ' + nautLastError.message : 'Runtime error';
+    monaco.editor.setModelMarkers(model, 'naut-error', [{
+      severity: monaco.MarkerSeverity.Error,
+      message: msg,
+      startLineNumber: line, startColumn: 1,
+      endLineNumber: line, endColumn: 1000,
+    }]);
+    window._monacoEditor.revealLineInCenter(line);
+  }
+
+  async function handleNautError(payload) {
+    nautLastError = payload;
+    const toastMsg = payload.exception + ': ' + payload.message;
+    showToast(toastMsg, 'error');
+    outputPrint('⛔ ' + toastMsg, 'line-stderr');
+    if (payload.frame && payload.frame.file) {
+      const name = payload.frame.file.split(/[/\\]/).pop();
+      await openFileSilent(payload.frame.file, name);
+      setTimeout(() => nautMarkError(payload.frame.file, payload.frame.line), 400);
+    }
+    if (groqApiKey) {
+      try {
+        const r = await window.api.ai.analyze({
+          apiKey: groqApiKey, model: nautModel(),
+          prompt: 'Analyze this Django runtime error and propose a concrete fix:\n\n' + (payload.traceback || payload.message),
+          files: [], mode: 'general', scanData,
+        });
+        addAiMessage('assistant', '🧠 **Error Interceptor:**\n\n' + r);
+      } catch (e) {}
+    } else {
+      addAiMessage('assistant', '⛔ **Runtime error:** ' + toastMsg + '\n\nSet a GROQ API key in Settings to get an AI-powered fix.');
+    }
+  }
+
+  function nautOnTelemetry(payload) {
+    if (!payload) return;
+    if (payload.kind === 'sql') ingestSql(payload);
+    else if (payload.kind === 'error') handleNautError(payload);
+    refreshCodeLenses();
+  }
+
+  // ── Monaco CodeLens: SQL telemetry + Signals ───────────────────────────
+
+  function registerNautCommands() {
+    if (typeof monaco === 'undefined' || window.__nautCmdsRegistered) return;
+    try {
+      monaco.editor.registerCommand('naut.sqlDetails', (_a, file, line) => nautShowSqlDetails(file, line));
+      monaco.editor.registerCommand('naut.signalDetails', (_a, file, line) => nautShowSignalDetails(file, line));
+      window.__nautCmdsRegistered = true;
+    } catch (e) {}
+  }
+
+  function registerCodeLenses() {
+    if (typeof monaco === 'undefined') return;
+    if (codeLensDisposable) { try { codeLensDisposable.dispose(); } catch {} codeLensDisposable = null; }
+    try {
+      codeLensDisposable = monaco.languages.registerCodeLensProvider('python', {
+        provideCodeLenses(model) {
+          if (!model || !model.uri) return { lenses: [] };
+          const path = nautNorm(model.uri.fsPath);
+          const lenses = [];
+          const sql = nautSqlLenses[path];
+          if (sql) {
+            for (const line of Object.keys(sql)) {
+              const e = sql[line];
+              const n = parseInt(line, 10);
+              const warn = e.queries > 5;
+              const title = '⏱ ' + e.queries + ' запросов · ' + e.time + 'ms' + (warn ? ' · N+1!' : '') + (e.view ? ' · ' + e.view : '');
+              lenses.push({
+                range: new monaco.Range(n, 1, n, 1),
+                command: { id: 'naut.sqlDetails', title, arguments: [path, n] },
+              });
+            }
+          }
+          const sig = nautSignalLenses[path];
+          if (sig) {
+            for (const s of sig) {
+              const title = '⚡ ' + s.total + ' signal handler' + (s.total === 1 ? '' : 's') + ' (save: ' + s.save + ', delete: ' + s.delete + ')';
+              lenses.push({
+                range: new monaco.Range(s.line, 1, s.line, 1),
+                command: { id: 'naut.signalDetails', title, arguments: [path, s.line] },
+              });
+            }
+          }
+          return { lenses };
+        },
+      });
+    } catch (e) {
+      console.warn('[naut] codelens failed:', e.message);
+    }
+  }
+
+  function refreshCodeLenses() {
+    registerNautCommands();
+    registerCodeLenses();
+  }
+
+  function nautShowSqlDetails(file, line) {
+    const data = (nautSqlLenses[file] || {})[line];
+    if (!data) return;
+    let html = '<div class="mig-summary">' + data.queries + ' queries · ' + data.time + 'ms total' + (data.view ? ' · view: ' + escapeHtml(data.view) : '') + '</div>';
+    html += data.sqls.map((q) => '<pre class="scrapbook-sql">' + escapeHtml(q.sql) + ' <span class="scrapbook-sql-time">' + (q.time || 0) + 'ms</span></pre>').join('');
+    nautModal('SQL Telemetry — line ' + line, html);
+  }
+
+  function nautShowSignalDetails(file, line) {
+    const list = (nautSignalLenses[file] || []).filter((s) => s.line === line);
+    if (!list.length) return;
+    const s = list[0];
+    let html = '<div class="mig-summary">' + s.model + ': ' + s.total + ' signal handler(s)</div>';
+    for (const sig of s.signals) {
+      html += '<div class="sig-item" data-file="' + escapeHtml(sig.file) + '" data-line="' + sig.line + '">' +
+        '<span class="sig-sender">' + escapeHtml(sig.signal || 'post_save') + '</span> → <span class="sig-handler">' + escapeHtml(sig.handler || '?') + '</span>' +
+        '<div style="font-size:10px;color:var(--text-dim)">' + escapeHtml(sig.file.split(/[/\\]/).pop()) + ':' + sig.line + '</div></div>';
+    }
+    const overlay = nautModal('Signal Effects — ' + s.model, html);
+    overlay.querySelectorAll('.sig-item').forEach((item) => {
+      item.addEventListener('click', () => nautGoto(item.dataset.file, parseInt(item.dataset.line, 10)));
+    });
+  }
+
+  async function nautGoto(file, line) {
+    const name = file.split(/[/\\]/).pop();
+    await openFileSilent(file, name);
+    setTimeout(() => {
+      if (window._monacoEditor && typeof monaco !== 'undefined') {
+        window._monacoEditor.revealLineInCenter(line);
+        window._monacoEditor.setPosition({ lineNumber: line, column: 1 });
+        window._monacoEditor.focus();
+      }
+    }, 250);
+  }
+
+  // ── Migration Guard ─────────────────────────────────────────────────────
+
+  async function nautRefreshMigrations() {
+    if (!currentFolder) return;
+    const el = $('#migration-body');
+    if (!el) return;
+    let res;
+    try { res = await window.api.migration.scan(currentFolder); } catch (e) { return; }
+
+    const statusEl = $('#status-migration');
+    const hasConflict = (res.conflicts && res.conflicts.length) || (res.brokenDeps && res.brokenDeps.length);
+    if (statusEl) {
+      if (hasConflict) {
+        statusEl.style.display = '';
+        statusEl.style.color = 'var(--red)';
+        statusEl.textContent = '⚠️ Migration conflict! (' + ((res.conflicts.length || 0) + (res.brokenDeps.length || 0)) + ')';
+        statusEl.onclick = () => switchToPanel('migrations');
+      } else {
+        statusEl.style.display = 'none';
+      }
+    }
+
+    let html = '<div class="mig-summary">' + res.migrations.length + ' migrations · ' + (res.conflicts.length || 0) + ' branch conflicts · ' + (res.brokenDeps.length || 0) + ' broken deps</div>';
+
+    if (res.conflicts && res.conflicts.length) {
+      html += '<div class="mig-section-title" style="color:var(--red)">Branch conflicts</div>';
+      for (const c of res.conflicts) {
+        html += '<div class="mig-item warn"><div><b>' + escapeHtml(c.app + '/' + c.number) + '</b></div>' +
+          '<div style="font-size:11px">' + escapeHtml(c.name) + ' on branch <b>' + escapeHtml(c.branch) + '</b> vs ' + escapeHtml(c.existsOn || '?') + '</div>' +
+          '<button class="mig-fix-btn" data-app="' + escapeHtml(c.app) + '" data-number="' + escapeHtml(c.number) + '" data-name="' + escapeHtml(c.name) + '">Auto-Fix</button></div>';
+      }
+    }
+    if (res.brokenDeps && res.brokenDeps.length) {
+      html += '<div class="mig-section-title" style="color:var(--yellow)">Broken dependencies</div>';
+      for (const b of res.brokenDeps) {
+        html += '<div class="mig-item"><div style="font-size:11px">' + escapeHtml(b.message) + '</div>' +
+          '<div style="font-size:10px;color:var(--text-dim)">' + escapeHtml(b.file) + '</div></div>';
+      }
+    }
+    html += '<div class="mig-section-title">Migrations by app</div>';
+    const byApp = {};
+    for (const m of res.migrations) { (byApp[m.app] = byApp[m.app] || []).push(m); }
+    for (const app of Object.keys(byApp)) {
+      html += '<div class="mig-app">' + escapeHtml(app) + '</div>';
+      for (const m of byApp[app]) {
+        html += '<div class="mig-item"><span class="mig-num">' + escapeHtml(m.number) + '</span> ' + escapeHtml(m.name) +
+          '<div style="font-size:10px;color:var(--text-dim)">' + m.deps.length + ' deps</div></div>';
+      }
+    }
+    el.innerHTML = html || '<div class="bug-empty"><p>No migrations found.</p></div>';
+    el.querySelectorAll('.mig-fix-btn').forEach((btn) => {
+      btn.addEventListener('click', () => nautFixMigration({ app: btn.dataset.app, number: btn.dataset.number, name: btn.dataset.name }, btn));
+    });
+  }
+
+  async function nautFixMigration(target, btn) {
+    if (!confirm('Auto-Fix will rename the conflicting migration and update dependents. Continue?')) return;
+    btn.disabled = true;
+    try {
+      const res = await window.api.migration.fix({ root: currentFolder, target });
+      if (res.success) {
+        showToast('Migration fixed', 'success');
+        await nautRefreshMigrations();
+        refreshFileTree();
+      } else {
+        showToast('Fix failed: ' + res.error, 'error');
+        btn.disabled = false;
+      }
+    } catch (e) {
+      showToast('Fix error: ' + e.message, 'error');
+      btn.disabled = false;
+    }
+  }
+
+  function switchToPanel(panelId) {
+    $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active'));
+    $$('.sidebar-panel').forEach((p) => p.classList.remove('active'));
+    const icon = $('[data-panel="' + panelId + '"]');
+    if (icon) icon.classList.add('active');
+    const panel = $('#panel-' + panelId);
+    if (panel) panel.classList.add('active');
+  }
+
+  // ── Celery Tasks ────────────────────────────────────────────────────────
+
+  async function nautRefreshTasks() {
+    if (!currentFolder) return;
+    const el = $('#task-body');
+    if (!el) return;
+    let res;
+    try { res = await window.api.celery.scan(currentFolder); } catch (e) { return; }
+    if (!res.tasks.length) {
+      el.innerHTML = '<div class="bug-empty"><p>No Celery tasks found (@shared_task / @app.task).</p></div>';
+      return;
+    }
+    let html = '<div class="mig-summary">' + res.tasks.length + ' tasks</div>';
+    for (const t of res.tasks) {
+      html += '<div class="task-item"><div class="task-name">' + escapeHtml(t.name) + '</div>' +
+        '<div style="font-size:10px;color:var(--text-dim)">' + escapeHtml(t.file.split(/[/\\]/).pop()) + ':' + t.line + '</div>' +
+        '<div class="task-actions"><button class="task-run-btn" data-name="' + escapeHtml(t.name) + '" data-args="' + escapeHtml(JSON.stringify(t.args)) + '">Run</button></div></div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.task-run-btn').forEach((btn) => {
+      btn.addEventListener('click', () => nautRunTask(btn.dataset.name, JSON.parse(btn.dataset.args)));
+    });
+  }
+
+  async function nautRunTask(name, args) {
+    const values = [];
+    for (const a of args) {
+      const v = prompt('Argument "' + a + '":', '');
+      if (v === null) return;
+      values.push(v);
+    }
+    const overlay = nautModal('Running ' + name, '<div class="mig-summary">Sending to Celery…</div><pre class="scrapbook-sql">' + escapeHtml(name) + '.delay(' + values.map((v) => JSON.stringify(v)).join(', ') + ')</pre>');
+    try {
+      const res = await window.api.celery.run({ root: currentFolder, task: name, args: values });
+      if (overlay.parentNode) overlay.remove();
+      if (res && res.ok) {
+        nautModal('Task result', '<div class="scrapbook-value">' + escapeHtml(JSON.stringify(res.result, null, 2)) + '</div>');
+      } else {
+        nautModal('Task failed', '<pre class="scrapbook-error">' + escapeHtml((res && (res.error || res.stdout)) || 'No result') + '</pre>');
+      }
+    } catch (e) {
+      if (overlay.parentNode) overlay.remove();
+      showToast('Task error: ' + e.message, 'error');
+    }
+  }
+
+  // ── Signals Tracer ──────────────────────────────────────────────────────
+
+  async function nautRefreshSignals() {
+    if (!currentFolder) return;
+    const el = $('#signals-body');
+    if (!el) return;
+    let res;
+    try { res = await window.api.signals.scan(currentFolder); } catch (e) { return; }
+
+    for (const k of Object.keys(nautSignalLenses)) delete nautSignalLenses[k];
+    for (const l of res.lenses || []) {
+      const model = (res.models || []).find((m) => m.name === l.model);
+      if (!model) continue;
+      const path = nautNorm(model.filePath);
+      (nautSignalLenses[path] = nautSignalLenses[path] || []).push({
+        line: model.line, model: l.model, total: l.total, save: l.save, delete: l.delete, signals: l.signals,
+      });
+    }
+    refreshCodeLenses();
+
+    let html = '<div class="mig-summary">' + (res.signals.length || 0) + ' receivers · ' + (res.lenses.length || 0) + ' models with side-effects</div>';
+    html += '<div class="mig-section-title">Signal receivers</div>';
+    for (const s of (res.signals || []).slice(0, 200)) {
+      html += '<div class="sig-item" data-file="' + escapeHtml(s.file) + '" data-line="' + s.line + '">' +
+        '<span class="sig-sender">' + escapeHtml(s.sender || '?') + '</span> → <span class="sig-handler">' + escapeHtml(s.handler || '?') + '</span>' +
+        ' <span class="sig-signal">' + escapeHtml(s.signal || '') + '</span>' +
+        '<div style="font-size:10px;color:var(--text-dim)">' + escapeHtml(s.file.split(/[/\\]/).pop()) + ':' + s.line + '</div></div>';
+    }
+    el.innerHTML = html || '<div class="bug-empty"><p>No signals found.</p></div>';
+    el.querySelectorAll('.sig-item').forEach((item) => {
+      item.addEventListener('click', () => nautGoto(item.dataset.file, parseInt(item.dataset.line, 10)));
+    });
+  }
+
+  // ── Dependencies ────────────────────────────────────────────────────────
+
+  async function nautRefreshDeps() {
+    if (!currentFolder) return;
+    const el = $('#deps-body');
+    if (!el) return;
+    el.innerHTML = '<div class="mig-summary">Checking PyPI…</div>';
+    let res;
+    try { res = await window.api.deps.scan(currentFolder); } catch (e) {
+      el.innerHTML = '<div class="bug-empty"><p>Dependency check failed: ' + escapeHtml(e.message) + '</p></div>';
+      return;
+    }
+    if (!res.file) {
+      el.innerHTML = '<div class="bug-empty"><p>No requirements.txt found.</p></div>';
+      return;
+    }
+    if (!res.packages.length) {
+      el.innerHTML = '<div class="bug-empty"><p>No parsable packages in requirements.txt.</p></div>';
+      return;
+    }
+    const outdated = res.packages.filter((p) => p.outdated).length;
+    const vuln = res.packages.filter((p) => p.vulns && p.vulns.length).length;
+    let html = '<div class="mig-summary">' + res.packages.length + ' packages · ' + outdated + ' outdated · ' + vuln + ' vulnerable</div>';
+    for (const p of res.packages) {
+      const cls = (p.vulns && p.vulns.length) ? 'dep-vuln' : p.outdated ? 'dep-outdated' : '';
+      html += '<div class="dep-item ' + cls + '"><div class="dep-name">' + escapeHtml(p.name) + '</div>' +
+        '<div class="dep-versions">' + escapeHtml(p.current || 'any') + ' → ' + escapeHtml(p.latest || '?') + '</div>';
+      if (p.vulns && p.vulns.length) {
+        html += '<div class="dep-vulns">' + p.vulns.map((v) => '<span title="' + escapeHtml(v.summary) + '">' + escapeHtml(v.id) + '</span>').join(' ') + '</div>';
+      }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }
+
+  // ── Scrapbook (Django Notebook) ─────────────────────────────────────────
+
+  let scrapbookCells = 0;
+
+  function scrapbookAddCell(code) {
+    const cells = $('#scrapbook-cells');
+    if (!cells) return;
+    const empty = cells.querySelector('.scrapbook-empty');
+    if (empty) empty.remove();
+    scrapbookCells++;
+    const div = document.createElement('div');
+    div.className = 'scrapbook-cell';
+    div.innerHTML =
+      '<div class="scrapbook-cell-toolbar"><span class="scrapbook-cell-id">[' + scrapbookCells + ']</span>' +
+      '<button class="scrapbook-cell-run" title="Run (Ctrl+Enter)">Run</button>' +
+      '<button class="scrapbook-cell-del" title="Delete cell">&times;</button></div>' +
+      '<textarea class="scrapbook-cell-input" rows="2" spellcheck="false" placeholder="Django code… (models auto-imported, Ctrl+Enter)">' + escapeHtml(code || '') + '</textarea>' +
+      '<div class="scrapbook-cell-output">' +
+      '<div class="scrapbook-out-tabs"><span class="scrapbook-out-tab active" data-t="result">Result</span><span class="scrapbook-out-tab" data-t="sql">SQL</span></div>' +
+      '<div class="scrapbook-out-body" data-t="result"><div class="scrapbook-out-empty">—</div></div>' +
+      '<div class="scrapbook-out-body" data-t="sql" style="display:none"></div>' +
+      '</div>';
+    cells.appendChild(div);
+    const ta = div.querySelector('.scrapbook-cell-input');
+    div.querySelector('.scrapbook-cell-run').addEventListener('click', () => scrapbookRun(div));
+    div.querySelector('.scrapbook-cell-del').addEventListener('click', () => div.remove());
+    div.querySelectorAll('.scrapbook-out-tab').forEach((t) => {
+      t.addEventListener('click', () => {
+        div.querySelectorAll('.scrapbook-out-tab').forEach((x) => x.classList.toggle('active', x === t));
+        div.querySelectorAll('.scrapbook-out-body').forEach((b) => { b.style.display = b.dataset.t === t.dataset.t ? '' : 'none'; });
+      });
+    });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); scrapbookRun(div); }
+    });
+    ta.focus();
+    return div;
+  }
+
+  async function scrapbookRun(div) {
+    if (!currentFolder) { showToast('Open a folder first', 'warning'); return; }
+    const ta = div.querySelector('.scrapbook-cell-input');
+    const runBtn = div.querySelector('.scrapbook-cell-run');
+    const badge = $('#scrapbook-badge');
+    if (badge) badge.textContent = '…';
+    runBtn.disabled = true;
+    runBtn.textContent = '…';
+    let res;
+    try {
+      res = await window.api.shell.exec({ root: currentFolder, code: ta.value });
+    } catch (e) {
+      res = { ok: false, error: e.message };
+    }
+    runBtn.disabled = false;
+    runBtn.textContent = 'Run';
+    if (badge) badge.textContent = '';
+    scrapbookRender(div, res);
+  }
+
+  function scrapbookRender(div, res) {
+    const resultBody = div.querySelector('.scrapbook-out-body[data-t="result"]');
+    const sqlBody = div.querySelector('.scrapbook-out-body[data-t="sql"]');
+    let resultHtml = '';
+    if (!res || !res.ok) {
+      resultHtml = '<pre class="scrapbook-error">' + escapeHtml((res && (res.error || res.stdout)) || 'Shell unavailable') + '</pre>';
+    } else {
+      if (res.stdout) resultHtml += '<pre class="scrapbook-stdout">' + escapeHtml(res.stdout) + '</pre>';
+      if (res.hasResult && res.result !== undefined) resultHtml += scrapbookRenderResult(res.result);
+      else if (!res.stdout) resultHtml += '<div class="scrapbook-out-empty">No output</div>';
+    }
+    resultBody.innerHTML = resultHtml || '<div class="scrapbook-out-empty">—</div>';
+
+    const queries = (res && res.queries) || [];
+    let sqlHtml = '';
+    if (queries.length) {
+      sqlHtml = '<div class="scrapbook-sql-count">' + queries.length + ' queries · ' + queries.reduce((a, q) => a + (parseFloat(q.time) || 0), 0).toFixed(2) + 'ms</div>';
+      sqlHtml += queries.map((q) => '<pre class="scrapbook-sql">' + escapeHtml(q.sql) + ' <span class="scrapbook-sql-time">' + (q.time || 0) + 'ms</span></pre>').join('');
+    } else {
+      sqlHtml = '<div class="scrapbook-out-empty">No SQL queries</div>';
+    }
+    sqlBody.innerHTML = sqlHtml;
+  }
+
+  function scrapbookRenderResult(v) {
+    if (Array.isArray(v) && v.length) {
+      const cols = Object.keys(v[0] || {});
+      let html = '<table class="scrapbook-table"><thead><tr>' + cols.map((c) => '<th>' + escapeHtml(String(c)) + '</th>').join('') + '</tr></thead><tbody>';
+      for (const row of v.slice(0, 20)) {
+        html += '<tr>' + cols.map((c) => {
+          const val = row[c];
+          const s = val === null || val === undefined ? '' : String(val);
+          return '<td>' + escapeHtml(s.length > 120 ? s.slice(0, 120) + '…' : s) + '</td>';
+        }).join('') + '</tr>';
+      }
+      html += '</tbody></table>';
+      if (v.length > 20) html += '<div class="scrapbook-out-empty">… ' + (v.length - 20) + ' more rows</div>';
+      return html;
+    }
+    if (v && typeof v === 'object' && Array.isArray(v.rows)) return scrapbookRenderResult(v.rows);
+    if (v && typeof v === 'object') {
+      return '<pre class="scrapbook-json">' + escapeHtml(JSON.stringify(v, null, 2).slice(0, 8000)) + '</pre>';
+    }
+    return '<pre class="scrapbook-value">' + escapeHtml(String(v)) + '</pre>';
+  }
+
+  // ── Mock Data Generator ─────────────────────────────────────────────────
+
+  async function nautMockData() {
+    if (!currentFolder) { showToast('Open a folder first', 'warning'); return; }
+    if (!scanData || scanData.error) { showToast('Open a Django project with models', 'warning'); return; }
+    if (!groqApiKey) { showToast('Set a GROQ API key in Settings', 'warning'); return; }
+    const amount = prompt('Rows to generate:', '20');
+    if (amount === null) return;
+    const overlay = nautModal('Generating mock data', '<div class="mig-summary">Groq is writing a seed script…</div>');
+    try {
+      const result = await window.api.mockdata.generate({
+        apiKey: groqApiKey, model: nautModel(), scanData, amount: parseInt(amount, 10) || 20,
+      });
+      if (overlay.parentNode) overlay.remove();
+      if (result.error) { showToast(result.error, 'error'); return; }
+      const code = typeof result === 'string' ? result : (result.choices && result.choices[0].message.content) || '';
+      if (!code) { showToast('AI returned empty script', 'error'); return; }
+      const runOverlay = nautModal('Mock data script',
+        '<pre class="scrapbook-sql" style="max-height:40vh;overflow:auto;white-space:pre-wrap">' + escapeHtml(code.slice(0, 12000)) + '</pre>' +
+        '<div style="margin-top:8px;display:flex;gap:8px">' +
+        '<button class="scrapbook-btn" id="mock-run">Run in Django shell</button>' +
+        '<button class="scrapbook-btn" id="mock-save">Save to file</button></div>');
+      runOverlay.querySelector('#mock-run').addEventListener('click', async () => {
+        runOverlay.querySelector('#mock-run').textContent = 'Running…';
+        const res = await window.api.shell.exec({ root: currentFolder, code });
+        runOverlay.querySelector('#mock-run').textContent = 'Run in Django shell';
+        nautModal('Seed result', res && res.ok
+          ? '<pre class="scrapbook-json">' + escapeHtml(JSON.stringify(res.result, null, 2)) + '</pre>' + (res.stdout ? '<pre class="scrapbook-stdout">' + escapeHtml(res.stdout) + '</pre>' : '')
+          : '<pre class="scrapbook-error">' + escapeHtml((res && res.error) || 'Failed') + '</pre>');
+      });
+      runOverlay.querySelector('#mock-save').addEventListener('click', async () => {
+        const name = prompt('Save as:', 'scripts/seed.py');
+        if (!name) return;
+        await window.api.fs.mkfile(currentFolder + '/' + name);
+        await window.api.fs.writefile({ filePath: currentFolder + '/' + name, content: code });
+        await refreshFileTree();
+        showToast('Saved: ' + name, 'success');
+      });
+    } catch (e) {
+      if (overlay.parentNode) overlay.remove();
+      showToast('Mock data error: ' + e.message, 'error');
+    }
+  }
+
+  // ── Agent install / runserver ───────────────────────────────────────────
+
+  async function nautInstallAgent() {
+    if (!currentFolder) return;
+    const info = await window.api.agent.path();
+    executeCommand('pip install -e "' + info + '"');
+    showToast('Installing DjangoNAUT agent…', 'success');
+  }
+
+  async function nautRunServer() {
+    if (!currentFolder) return;
+    const st = await window.api.telemetry.getState();
+    const port = st.port || 0;
+    executeCommand('python manage.py runserver_naut --naut-port ' + port);
+    showToast('runserver_naut started in terminal (telemetry port ' + port + ')', 'success');
+  }
+
+  async function nautAfterFolderOpen() {
+    if (!currentFolder) return;
+    try {
+      const st = await window.api.telemetry.getState();
+      nautTelemetryPort = st.port || 0;
+      const pl = $('#naut-port-label');
+      if (pl) pl.textContent = 'Port: ' + (st.port || '—');
+    } catch (e) {}
+    nautRefreshMigrations();
+    nautRefreshSignals();
+    nautRefreshTasks();
+    nautRefreshDeps();
+    try {
+      const info = await window.api.agent.check(currentFolder);
+      const hint = $('#agent-status');
+      if (hint) hint.textContent = info.installed ? 'Agent: installed' : (info.present ? 'Agent: needs install (pip install -e …)' : 'Agent: not found');
+    } catch (e) {}
+  }
+
+  // ── Wire up ─────────────────────────────────────────────────────────────
+
+  window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
+
+  $('#btn-migration-scan')?.addEventListener('click', nautRefreshMigrations);
+  $('#btn-task-scan')?.addEventListener('click', nautRefreshTasks);
+  $('#btn-signals-scan')?.addEventListener('click', nautRefreshSignals);
+  $('#btn-deps-scan')?.addEventListener('click', nautRefreshDeps);
+  $('#btn-mock-data')?.addEventListener('click', nautMockData);
+  $('#btn-naut-runserver')?.addEventListener('click', nautRunServer);
+  $('#btn-naut-install')?.addEventListener('click', nautInstallAgent);
+  $('#scrapbook-add-cell')?.addEventListener('click', () => scrapbookAddCell());
+  $('#scrapbook-run-all')?.addEventListener('click', () => {
+    document.querySelectorAll('.scrapbook-cell').forEach((c, i) => setTimeout(() => scrapbookRun(c), i * 400));
+  });
+  $('#scrapbook-clear')?.addEventListener('click', () => {
+    $('#scrapbook-cells').innerHTML = '<div class="scrapbook-empty">Add a cell and run Django code (Ctrl+Enter). Models are auto-imported.</div>';
+  });
+
+  $('#panel-tab-scrapbook')?.addEventListener('click', () => {
+    setTimeout(() => {
+      const ta = document.querySelector('.scrapbook-cell:last-child .scrapbook-cell-input');
+      if (ta) ta.focus();
+    }, 100);
+  });
+
+  (function nautInitCodeLens() {
+    if (typeof monaco !== 'undefined' && window._monacoEditor) {
+      registerNautCommands();
+      registerCodeLenses();
+      return;
+    }
+    setTimeout(nautInitCodeLens, 700);
+  })();
 })();

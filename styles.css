@@ -2383,3 +2383,330 @@ body {
   background: rgba(121, 121, 121, 0.7);
   background-clip: content-box;
 }
+
+/* === DjangoNAUT Agent Features === */
+
+/* Telemetry bar (Django panel) */
+.naut-telemetry-bar {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: var(--bg-2, #1f2428);
+}
+.naut-telemetry-bar button,
+.scrapbook-btn {
+  background: var(--bg-3, #2a2f36);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.naut-telemetry-bar button:hover,
+.scrapbook-btn:hover {
+  border-color: var(--accent);
+}
+.naut-port-label {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+}
+
+/* Migration guard panel */
+.mig-summary {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-dim, #9aa4af);
+  border-bottom: 1px solid var(--border);
+}
+.mig-section-title {
+  padding: 8px 10px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-dim, #9aa4af);
+}
+.mig-app {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.mig-item {
+  padding: 6px 10px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+}
+.mig-item.warn {
+  border-left: 3px solid var(--red, #f14c4c);
+  background: rgba(241, 76, 76, 0.08);
+}
+.mig-num {
+  font-family: var(--font-mono, monospace);
+  color: var(--text-dim, #9aa4af);
+  margin-right: 4px;
+}
+.mig-fix-btn {
+  margin-top: 4px;
+  align-self: flex-start;
+  background: var(--red, #f14c4c);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+/* Celery tasks */
+.task-item {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+}
+.task-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--accent);
+}
+.task-actions {
+  margin-top: 4px;
+}
+.task-run-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+/* Signals */
+.sig-item {
+  padding: 6px 10px;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+  cursor: pointer;
+}
+.sig-item:hover {
+  background: rgba(128,128,128,0.08);
+}
+.sig-sender {
+  color: var(--yellow, #e2c08d);
+  font-weight: 600;
+}
+.sig-handler {
+  color: var(--accent);
+}
+.sig-signal {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+}
+
+/* Dependencies */
+.dep-item {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+}
+.dep-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+}
+.dep-versions {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+}
+.dep-item.dep-outdated .dep-versions {
+  color: var(--yellow, #e2c08d);
+}
+.dep-item.dep-vuln {
+  border-left: 3px solid var(--red, #f14c4c);
+}
+.dep-vulns span {
+  display: inline-block;
+  font-size: 9px;
+  background: var(--red, #f14c4c);
+  color: #fff;
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin: 3px 3px 0 0;
+  cursor: default;
+}
+
+/* Scrapbook (Django Notebook) */
+.scrapbook-toolbar {
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.scrapbook-title {
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: auto;
+}
+.scrapbook-cells {
+  padding: 10px;
+  overflow: auto;
+  flex: 1;
+}
+.scrapbook-empty {
+  color: var(--text-dim, #9aa4af);
+  font-size: 12px;
+  text-align: center;
+  padding: 30px;
+}
+.scrapbook-cell {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: var(--bg-2, #1f2428);
+}
+.scrapbook-cell-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.scrapbook-cell-id {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  font-family: var(--font-mono, monospace);
+}
+.scrapbook-cell-run {
+  margin-left: auto;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.scrapbook-cell-del {
+  background: transparent;
+  color: var(--text-dim, #9aa4af);
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+.scrapbook-cell-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  padding: 8px;
+  resize: vertical;
+  outline: none;
+}
+.scrapbook-cell-output {
+  border-top: 1px solid var(--border);
+}
+.scrapbook-out-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-3, #2a2f36);
+}
+.scrapbook-out-tab {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.scrapbook-out-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+.scrapbook-out-body {
+  padding: 8px;
+  font-size: 11px;
+}
+.scrapbook-out-empty {
+  color: var(--text-dim, #9aa4af);
+  font-size: 11px;
+}
+.scrapbook-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+.scrapbook-table th {
+  text-align: left;
+  background: var(--bg-3, #2a2f36);
+  color: var(--text-dim, #9aa4af);
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+.scrapbook-table td {
+  padding: 3px 6px;
+  border: 1px solid rgba(128,128,128,0.15);
+  font-family: var(--font-mono, monospace);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scrapbook-sql {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  background: var(--bg-3, #2a2f36);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+  margin: 4px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.scrapbook-sql-time {
+  color: var(--yellow, #e2c08d);
+}
+.scrapbook-sql-count {
+  font-size: 11px;
+  color: var(--text-dim, #9aa4af);
+  margin-bottom: 4px;
+}
+.scrapbook-stdout {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: var(--bg-3, #2a2f36);
+  padding: 6px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+.scrapbook-error {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: rgba(241, 76, 76, 0.15);
+  color: #f2a0a0;
+  padding: 6px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.scrapbook-value {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+}
+.scrapbook-json {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+.naut-modal .modal-body {
+  font-size: 12px;
+}

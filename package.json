@@ -33,7 +33,12 @@
     "directories": {
       "output": "dist"
     },
-    "extraResources": [],
+    "extraResources": [
+      {
+        "from": "python-agent",
+        "to": "python-agent"
+      }
+    ],
     "asarUnpack": [
       "terminal-server.js",
       "node_modules/ws/**/*",

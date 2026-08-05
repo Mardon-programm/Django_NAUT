@@ -7,6 +7,11 @@ const https = require('node:https');
 
 const { scanProject } = require('./django-scanner');
 const { runBugHunter } = require('./bughunter');
+const { startTelemetryServer, getState } = require('./telemetry-server');
+const migrationGuard = require('./migration-guard');
+const { scanSignals, getSignalLenses, scanTasks } = require('./agent-scanners');
+const shellRPC = require('./shell-rpc');
+const deps = require('./deps-updater');
 
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-compositing');
@@ -32,6 +37,25 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   await startTerminalServer();
+
+  // DjangoNAUT agent location (python-agent) for shell RPC
+  if (app.isPackaged) {
+    shellRPC.setAgentDir(path.join(process.resourcesPath, 'python-agent'));
+  } else {
+    shellRPC.setAgentDir(path.join(__dirname, 'python-agent'));
+  }
+
+  // Telemetry listener: Python agent posts SQL/error events here
+  try {
+    await startTelemetryServer((payload) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send('telemetry:event', payload);
+      }
+    });
+  } catch (err) {
+    console.error('[telemetry] failed to start:', err.message);
+  }
+
   createWindow();
 });
 
@@ -911,4 +935,106 @@ ipcMain.handle('deploy:check', async (_event, { cwd, deployType }) => {
   checks.push({ name: 'Static files', passed: staticCheck.passed, detail: staticCheck.detail });
 
   return checks;
+});
+
+// ── DjangoNAUT Agent Features ──────────────────────────────────────────────
+
+ipcMain.handle('telemetry:getState', () => getState());
+
+ipcMain.handle('agent:path', () => {
+  if (app.isPackaged) return path.join(process.resourcesPath, 'python-agent');
+  return path.join(__dirname, 'python-agent');
+});
+
+ipcMain.handle('agent:check', async (_e, root) => {
+  const agentDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'python-agent')
+    : path.join(__dirname, 'python-agent');
+  const present = fs.existsSync(path.join(agentDir, 'django_naut'));
+  let installed = false;
+  try {
+    const { execSync } = require('node:child_process');
+    const py = shellRPC.findPython(root || process.cwd());
+    const out = execSync(py + ' -c "import django_naut; print(django_naut.__version__)"', {
+      timeout: 10000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    installed = /1\.0\.0/.test(out);
+  } catch {}
+  return { present, installed, agentDir };
+});
+
+ipcMain.handle('migration:scan', (_e, root) => {
+  const migrations = migrationGuard.scanMigrations(root);
+  const conflicts = migrationGuard.checkBranchConflicts(root);
+  const brokenDeps = migrationGuard.checkBrokenDeps(migrations);
+  return { migrations, conflicts, brokenDeps };
+});
+
+ipcMain.handle('migration:fix', (_e, { root, target }) => {
+  return migrationGuard.autoFix(root, target);
+});
+
+ipcMain.handle('signals:scan', async (_e, root) => {
+  const scan = await scanProject(root);
+  const signals = scanSignals(root);
+  const models = scan.error ? [] : scan.models;
+  const lenses = getSignalLenses(signals, models);
+  return { signals, lenses, models };
+});
+
+ipcMain.handle('celery:scan', (_e, root) => {
+  return { tasks: scanTasks(root) };
+});
+
+ipcMain.handle('celery:run', async (_e, { root, task, args }) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  const argStr = (args || []).map((a) => JSON.stringify(a)).join(', ');
+  return shell.exec(`result = ${task}.delay(${argStr})\nresult`);
+});
+
+ipcMain.handle('shell:exec', async (_e, { root, code }) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(code);
+});
+
+ipcMain.handle('shell:ping', async (_e, root) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.ping();
+});
+
+ipcMain.handle('shell:close', (_e, root) => {
+  shellRPC.closeShell(root);
+  return { success: true };
+});
+
+ipcMain.handle('deps:scan', async (_e, root) => {
+  return deps.scanDeps(root);
+});
+
+ipcMain.handle('ai:mockdata', async (_e, { apiKey, model, scanData, amount }) => {
+  if (!scanData || scanData.error || !scanData.models.length) {
+    return { error: 'Open a Django project with models first' };
+  }
+  const modelDesc = scanData.models
+    .map((m) => `${m.name}(${m.fields.map((f) => `${f.name}: ${f.type}${f.relatedModel ? '->' + f.relatedModel : ''}`).join(', ')})`)
+    .join('\n');
+  const prompt =
+`You are a Django data factory. Generate a Python script (Django ORM, plain code, no shell_plus syntax) that populates the local database with ${amount || 20} realistic, logically consistent rows.
+
+Models:
+${modelDesc}
+
+Rules:
+- Use only the models listed; resolve FKs with existing or freshly created related objects.
+- Dates, prices, statuses and related data must be internally consistent.
+- Use bulk_create where sensible; guard against duplicates.
+- Output ONLY Python code, no markdown fences, no comments, no explanation.`;
+
+  return groqRequest(getGroqKey(apiKey), model, [
+    { role: 'system', content: 'You are an expert Django developer generating database seed scripts. Output only Python code.' },
+    { role: 'user', content: prompt },
+  ]);
 });

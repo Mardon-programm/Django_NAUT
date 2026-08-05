@@ -89,4 +89,45 @@ contextBridge.exposeInMainWorld('api', {
   terminal: {
     getPort: () => ipcRenderer.invoke('terminal:getPort'),
   },
+
+  telemetry: {
+    getState: () => ipcRenderer.invoke('telemetry:getState'),
+    onEvent: (callback) => {
+      ipcRenderer.removeAllListeners('telemetry:event');
+      ipcRenderer.on('telemetry:event', (_event, data) => callback(data));
+    },
+  },
+
+  agent: {
+    path: () => ipcRenderer.invoke('agent:path'),
+    check: (root) => ipcRenderer.invoke('agent:check', root),
+  },
+
+  migration: {
+    scan: (root) => ipcRenderer.invoke('migration:scan', root),
+    fix: (opts) => ipcRenderer.invoke('migration:fix', opts),
+  },
+
+  signals: {
+    scan: (root) => ipcRenderer.invoke('signals:scan', root),
+  },
+
+  celery: {
+    scan: (root) => ipcRenderer.invoke('celery:scan', root),
+    run: (opts) => ipcRenderer.invoke('celery:run', opts),
+  },
+
+  shell: {
+    exec: (opts) => ipcRenderer.invoke('shell:exec', opts),
+    ping: (root) => ipcRenderer.invoke('shell:ping', root),
+    close: (root) => ipcRenderer.invoke('shell:close', root),
+  },
+
+  deps: {
+    scan: (root) => ipcRenderer.invoke('deps:scan', root),
+  },
+
+  mockdata: {
+    generate: (opts) => ipcRenderer.invoke('ai:mockdata', opts),
+  },
 });
