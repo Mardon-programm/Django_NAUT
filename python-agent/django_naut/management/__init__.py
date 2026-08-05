@@ -1,1 +1,0 @@
-"""DjangoNAUT management commands."""

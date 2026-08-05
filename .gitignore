@@ -6,3 +6,6 @@ dist/
 django_editor_v1/
 django_editor_v2/
 .env
+__pycache__/
+*.pyc
+*.pyo
