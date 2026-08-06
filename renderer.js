@@ -3817,6 +3817,7 @@
       { label: 'View: Toggle Forms', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="forms"]').classList.add('active'); $('#panel-forms').classList.add('active'); nautRefreshForms(); }, category: 'View' },
       { label: 'View: Toggle Static Files', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="static"]').classList.add('active'); $('#panel-static').classList.add('active'); nautRefreshStatic(); }, category: 'View' },
       { label: 'View: Toggle ASGI / Routing', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="asgi"]').classList.add('active'); $('#panel-asgi').classList.add('active'); nautRefreshAsgi(); }, category: 'View' },
+      { label: 'View: Toggle Manage Commands', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="commands"]').classList.add('active'); $('#panel-commands').classList.add('active'); nautRefreshCommands(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -5313,6 +5314,7 @@
     nautRefreshForms();
     nautRefreshStatic();
     nautRefreshAsgi();
+    nautRefreshCommands();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -6504,6 +6506,88 @@
       row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
     });
   }
+
+  // ── Manage Commands Inspector ──────────────────────────────────────────
+  let _cmdsData = null;
+  let _cmdsFilter = '';
+
+  async function nautRefreshCommands() {
+    if (!currentFolder) return;
+    const el = $('#commands-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Resolving manage.py commands…</p></div>';
+    let res;
+    try { res = await window.api.commands.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(String(data.error).split('\n').pop()) + '</p></div>'; return; }
+    _cmdsData = data;
+    nautRenderCommands();
+  }
+
+  function nautRenderCommands() {
+    const el = $('#commands-body');
+    if (!el) return;
+    const st = $('#commands-status');
+    const data = _cmdsData;
+    if (!data || !Array.isArray(data.commands)) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>No command data.</p></div>';
+      return;
+    }
+    const q = _cmdsFilter.toLowerCase();
+    const match = (s) => !q || (s || '').toLowerCase().includes(q);
+    const all = data.commands.filter((c) => match(c.name) || match(c.help) || match(c.app) || match(c.module));
+    const proj = all.filter((c) => !c.builtin);
+    const builtin = all.filter((c) => c.builtin);
+    if (st) {
+      const parts = [data.total + ' commands', data.projectCount + ' project'];
+      if (data.builtinCount) parts.push(data.builtinCount + ' builtin');
+      if (data.errors && data.errors.length) parts.push(data.errors.length + ' errors');
+      st.textContent = parts.join(' · ');
+    }
+    let html = '';
+    if (data.errors && data.errors.length) {
+      for (const e of data.errors.slice(0, 5)) {
+        html += '<div class="tpl-shadowed">⚠ ' + escapeHtml(e.name + ': ' + (e.error || 'failed to load')) + '</div>';
+      }
+    }
+    if (proj.length) {
+      html += '<div class="orm-subtitle">Project commands (' + proj.length + ')</div>';
+      for (const c of proj) {
+        html += '<div class="cmd-row"' + (c.file ? ' data-open="' + escapeHtml(c.file) + '"' : '') + '>' +
+          '<div class="cmd-line"><span class="cmd-name">' + escapeHtml(c.name) + '</span>' +
+          (c.app ? '<span class="cmd-app">' + escapeHtml(c.app) + '</span>' : '') +
+          (c.hidden ? '<span class="cmd-chip">hidden</span>' : '') +
+          (c.requires && c.requires.length ? '<span class="cmd-chip">' + escapeHtml(c.requires.join('+')) + '</span>' : '') +
+          '</div>' +
+          (c.help ? '<div class="cmd-help">' + escapeHtml(c.help) + '</div>' : '') +
+          (c.file ? '<div class="sec-file">' + escapeHtml(c.file.split(/[/\\]/).slice(-2).join('/')) + '</div>' : '') +
+          '</div>';
+      }
+    } else if (!q) {
+      html += '<div class="orm-subtitle">Project commands</div><div class="bug-empty"><p>No project-defined commands yet. Add a <code>management/commands</code> package to an app.</p></div>';
+    }
+    if (builtin.length) {
+      html += '<details class="cmd-builtin"><summary>Django core commands (' + builtin.length + ')</summary>';
+      for (const c of builtin) {
+        html += '<div class="cmd-row"' + (c.file ? ' data-open="' + escapeHtml(c.file) + '"' : '') + '>' +
+          '<div class="cmd-line"><span class="cmd-name">' + escapeHtml(c.name) + '</span>' +
+          (c.help ? '<span class="cmd-help-inline">' + escapeHtml(c.help) + '</span>' : '') +
+          '</div></div>';
+      }
+      html += '</details>';
+    }
+    if (!proj.length && !builtin.length && !data.errors) {
+      html += '<div class="bug-empty"><p>No commands found.</p></div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-open]').forEach((row) => {
+      if (!row.dataset.open) return;
+      row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
+    });
+  }
+
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
@@ -6550,6 +6634,8 @@
   $('#btn-static-refresh')?.addEventListener('click', nautRefreshStatic);
   $('#asgi-search')?.addEventListener('input', (e) => { _asgiFilter = e.target.value; nautRenderAsgi(); });
   $('#btn-asgi-refresh')?.addEventListener('click', nautRefreshAsgi);
+  $('#commands-search')?.addEventListener('input', (e) => { _cmdsFilter = e.target.value; nautRenderCommands(); });
+  $('#btn-commands-refresh')?.addEventListener('click', nautRefreshCommands);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

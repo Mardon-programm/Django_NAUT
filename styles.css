@@ -3089,6 +3089,72 @@ body {
   color: var(--text-dim, #9aa4af);
 }
 
+/* Manage Commands Inspector */
+.cmd-row {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.08);
+  cursor: pointer;
+}
+.cmd-row[data-open]:hover {
+  background: rgba(77, 163, 255, 0.08);
+}
+.cmd-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cmd-name {
+  font-family: var(--mono, 'Cascadia Code', Consolas, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent, #4da3ff);
+}
+.cmd-app {
+  font-size: 9px;
+  color: var(--text-dim, #9aa4af);
+  background: rgba(128, 128, 128, 0.12);
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: lowercase;
+}
+.cmd-chip {
+  font-size: 9px;
+  color: #f0c674;
+  background: rgba(240, 198, 116, 0.1);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.cmd-help {
+  font-size: 11px;
+  color: var(--text-dim, #9aa4af);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.cmd-help-inline {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+.cmd-builtin {
+  margin: 8px 10px;
+}
+.cmd-builtin summary {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim, #9aa4af);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.cmd-builtin summary:hover {
+  color: var(--accent, #4da3ff);
+}
+
 /* Settings & Env Inspector */
 .cfg-section {
   border-bottom: 1px solid rgba(128,128,128,0.08);

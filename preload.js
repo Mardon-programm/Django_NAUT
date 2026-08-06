@@ -179,6 +179,10 @@ contextBridge.exposeInMainWorld('api', {
     scan: (root) => ipcRenderer.invoke('asgi:scan', root),
   },
 
+  commands: {
+    scan: (root) => ipcRenderer.invoke('commands:scan', root),
+  },
+
   mail: {
     list: (root) => ipcRenderer.invoke('mail:list', root),
     read: (id, root) => ipcRenderer.invoke('mail:read', { root, id }),

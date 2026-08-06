@@ -24,6 +24,7 @@ const templateInspector = require('./template-inspector');
 const formsInspector = require('./forms-inspector');
 const staticInspector = require('./static-inspector');
 const asgiInspector = require('./asgi-inspector');
+const commandsInspector = require('./commands-inspector');
 const migrationGraph = require('./migration-graph');
 
 const FULL_LIMITS = { jsonLimits: { list: 10000, dict: 1000, depth: 8 } };
@@ -1236,6 +1237,12 @@ ipcMain.handle('asgi:scan', async (_e, root) => {
   const shell = shellRPC.getShell(root);
   if (!shell) return { ok: false, error: 'No project root' };
   return shell.exec(asgiInspector.scanCode(), FULL_LIMITS);
+});
+
+ipcMain.handle('commands:scan', async (_e, root) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(commandsInspector.scanCode(), FULL_LIMITS);
 });
 
 ipcMain.handle('test:scan', (_e, root) => {
