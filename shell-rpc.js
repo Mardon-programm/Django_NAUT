@@ -109,8 +109,8 @@ class ShellRPC {
     return this._request('ping', {});
   }
 
-  exec(code) {
-    return this._request('exec', { code });
+  exec(code, opts) {
+    return this._request('exec', { code, ...(opts || {}) });
   }
 
   _request(type, payload) {

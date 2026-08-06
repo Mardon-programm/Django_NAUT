@@ -5198,6 +5198,7 @@
     nautRefreshOrm();
     nautRefreshCfg();
     nautRefreshMail();
+    nautRefreshTpl();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -5969,6 +5970,109 @@
     nautRefreshMail();
   }
 
+  // ── Template Inspector ──────────────────────────────────────────────────
+  let _tplData = null;
+  let _tplFilter = '';
+  let _tplOpen = {};
+
+  async function nautRefreshTpl() {
+    if (!currentFolder) return;
+    const el = $('#tpl-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Scanning templates…</p></div>';
+    let res;
+    try { res = await window.api.tpl.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(data.error.split('\n').pop()) + '</p></div>'; return; }
+    _tplData = data;
+    _tplOpen = {};
+    nautRenderTpl();
+  }
+
+  function nautRenderTpl() {
+    const el = $('#tpl-body');
+    if (!el) return;
+    const st = $('#tpl-status');
+    if (!_tplData || !_tplData.templates) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>No template data.</p></div>';
+      return;
+    }
+    const q = _tplFilter.toLowerCase();
+    const rows = _tplData.templates.filter((t) =>
+      !q || t.name.toLowerCase().includes(q) || t.path.toLowerCase().includes(q) ||
+      (t.extends || []).join(' ').toLowerCase().includes(q) ||
+      (t.includes || []).join(' ').toLowerCase().includes(q));
+    if (st) {
+      const summary = _tplData.count + ' templates' + (_tplData.brokenCount ? ' · ' + _tplData.brokenCount + ' broken refs' : '') + (_tplData.shadowed && _tplData.shadowed.length ? ' · ' + _tplData.shadowed.length + ' shadowed' : '');
+      st.textContent = summary;
+    }
+    if (!rows.length) {
+      el.innerHTML = '<div class="bug-empty"><p>' + (q ? 'No matching templates.' : 'No templates found.') + '</p></div>';
+      return;
+    }
+    let html = '<div class="mig-summary">' + (q ? rows.length + ' of ' + _tplData.count + ' templates' : _tplData.count + ' templates') +
+      (_tplData.dirs && _tplData.dirs.length ? ' · ' + _tplData.dirs.length + ' dirs' : '') + '</div>';
+    if (_tplData.shadowed && _tplData.shadowed.length) {
+      for (const s of _tplData.shadowed) {
+        html += '<div class="tpl-shadowed">⚠ ' + escapeHtml(s.name) + ' shadowed (' + s.paths.length + ' copies)</div>';
+      }
+    }
+    for (const t of rows) {
+      const isOpen = _tplOpen[t.name + '|' + t.path];
+      const extHtml = (t.extends || []).map((n) => {
+        const broken = (t.brokenExtends || []).includes(n);
+        const target = _tplData.templates.filter((x) => x.name === n)[0];
+        return '<span class="tpl-ref' + (broken ? ' broken' : '') + '"' + (target ? ' data-open="' + escapeHtml(target.path) + '"' : '') + '>' + escapeHtml(n) + (broken ? ' ⚠' : '') + '</span>';
+      }).join(' → ') || '<span class="tpl-dim">base</span>';
+      const incCount = (t.includes || []).length;
+      const incBroken = (t.brokenIncludes || []).length;
+      html += '<div class="tpl-item' + (isOpen ? ' open' : '') + '">' +
+        '<div class="tpl-head" data-name="' + escapeHtml(t.name) + '" data-path="' + escapeHtml(t.path) + '">' +
+          '<div class="tpl-name">' + escapeHtml(t.name) + (incBroken ? ' <span class="tpl-badge-bad">' + incBroken + ' bad</span>' : '') + '</div>' +
+          '<div class="tpl-chain">' + extHtml + '</div>' +
+          '<div class="tpl-meta">' + (incCount ? '⚲ ' + incCount + ' include' + (incCount === 1 ? '' : 's') : '') + ' · ' + escapeHtml(t.path.split(/[/\\]/).pop()) + '</div>' +
+        '</div>' +
+        (isOpen ? '<div class="tpl-detail">' + nautTplDetail(t) + '</div>' : '') +
+      '</div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.tpl-head').forEach((head) => {
+      head.addEventListener('click', () => {
+        const key = head.dataset.name + '|' + head.dataset.path;
+        _tplOpen[key] = !_tplOpen[key];
+        nautRenderTpl();
+      });
+    });
+    el.querySelectorAll('.tpl-ref[data-open]').forEach((ref) => {
+      ref.addEventListener('click', (e) => {
+        e.stopPropagation();
+        nautGoto(ref.dataset.open, 1);
+      });
+    });
+    el.querySelectorAll('.tpl-incl[data-open]').forEach((ref) => {
+      ref.addEventListener('click', () => nautGoto(ref.dataset.open, 1));
+    });
+    el.querySelectorAll('.tpl-head').forEach((head) => {
+      head.addEventListener('dblclick', () => nautGoto(head.dataset.path, 1));
+    });
+  }
+
+  function nautTplDetail(t) {
+    let html = '';
+    if (t.includes && t.includes.length) {
+      html += '<div class="tpl-detail-title">Includes</div>';
+      for (const n of t.includes) {
+        const broken = (t.brokenIncludes || []).includes(n);
+        const target = _tplData.templates.filter((x) => x.name === n)[0];
+        html += '<div class="tpl-incl' + (broken ? ' broken' : '') + '"' + (target ? ' data-open="' + escapeHtml(target.path) + '"' : '') + '>' + escapeHtml(n) + (broken ? ' ⚠ not found' : '') + '</div>';
+      }
+    }
+    html += '<div class="tpl-path">' + escapeHtml(t.path) + '</div>';
+    return html;
+  }
+
   // ── Wire up ─────────────────────────────────────────────────────────────
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
@@ -6008,6 +6112,8 @@
     const b = $('#btn-req-scroll');
     if (b) b.classList.toggle('req-auto-on', nautReqAuto);
   });
+  $('#tpl-search')?.addEventListener('input', (e) => { _tplFilter = e.target.value; nautRenderTpl(); });
+  $('#btn-tpl-refresh')?.addEventListener('click', nautRefreshTpl);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

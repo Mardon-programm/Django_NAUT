@@ -55,7 +55,7 @@ def _auto_import_models(namespace):
             pass
 
 
-def _to_jsonable(value, depth=0):
+def _to_jsonable(value, depth=0, list_limit=50, dict_limit=50):
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
     if isinstance(value, (list, tuple, set)):
@@ -64,14 +64,14 @@ def _to_jsonable(value, depth=0):
         out = []
         for v in value:
             try:
-                out.append(_to_jsonable(v, depth + 1))
+                out.append(_to_jsonable(v, depth + 1, list_limit, dict_limit))
             except Exception:
                 out.append(str(v))
-        return out[:50]
+        return out[:list_limit]
     if isinstance(value, dict):
         if depth > 3:
             return "{...}"
-        return {str(k): _to_jsonable(v, depth + 1) for k, v in list(value.items())[:50]}
+        return {str(k): _to_jsonable(v, depth + 1, list_limit, dict_limit) for k, v in list(value.items())[:dict_limit]}
     try:
         import datetime, decimal
         if isinstance(value, datetime.datetime):
@@ -96,7 +96,7 @@ def _to_jsonable(value, depth=0):
                 if hasattr(obj, "_meta"):
                     rows.append({"model": type(obj).__name__, "pk": obj.pk, **{f.name: getattr(obj, f.name) for f in obj._meta.fields}})
                 else:
-                    rows.append(_to_jsonable(obj, depth + 1))
+                    rows.append(_to_jsonable(obj, depth + 1, list_limit, dict_limit))
             return {"queryset": type(value).__name__, "total": value.count(), "rows": rows}
         except Exception:
             pass
@@ -106,7 +106,7 @@ def _to_jsonable(value, depth=0):
         return "<unprintable>"
 
 
-def _exec_code(code):
+def _exec_code(code, list_limit=50, dict_limit=50):
     out = io.StringIO()
     old_stdout, old_stderr = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = out, out
@@ -139,7 +139,7 @@ def _exec_code(code):
         return {
             "ok": True,
             "stdout": out.getvalue(),
-            "result": _to_jsonable(result) if has_result else None,
+            "result": _to_jsonable(result, 0, list_limit, dict_limit) if has_result else None,
             "hasResult": has_result,
             "queries": [{"sql": q["sql"], "time": q["time"]} for q in ctx.captured_queries],
         }
@@ -172,7 +172,12 @@ def main():
             sys.stdout.flush()
             continue
         if msg.get("type") == "exec":
-            result = _exec_code(msg.get("code", ""))
+            limits = msg.get("jsonLimits") or {}
+            result = _exec_code(
+                msg.get("code", ""),
+                int(limits.get("list", 50)),
+                int(limits.get("dict", 50)),
+            )
             sys.stdout.write(json.dumps({"id": rid, **result}, default=str) + "\n")
             sys.stdout.flush()
             continue

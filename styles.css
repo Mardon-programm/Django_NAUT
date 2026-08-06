@@ -3147,6 +3147,104 @@ body {
   font-size: 9.5px;
 }
 
+/* Template inspector */
+.tpl-shadowed {
+  font-size: 10px;
+  color: var(--yellow, #d29922);
+  padding: 3px 10px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+}
+.tpl-item {
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+}
+.tpl-item.open .tpl-head {
+  background: rgba(77, 163, 255, 0.1);
+}
+.tpl-head {
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tpl-head:hover {
+  background: rgba(77, 163, 255, 0.08);
+}
+.tpl-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text, #d6dde3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tpl-badge-bad {
+  font-size: 9px;
+  color: #f85149;
+  background: rgba(248,81,73,0.15);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 4px;
+}
+.tpl-chain {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.tpl-ref {
+  color: var(--accent, #4da3ff);
+  cursor: pointer;
+}
+.tpl-ref:hover {
+  text-decoration: underline;
+}
+.tpl-ref.broken {
+  color: #f85149;
+}
+.tpl-dim {
+  color: var(--text-dim, #9aa4af);
+  opacity: 0.7;
+}
+.tpl-meta {
+  font-size: 9.5px;
+  color: var(--text-dim, #9aa4af);
+  opacity: 0.85;
+}
+.tpl-detail {
+  border-top: 1px solid rgba(128,128,128,0.12);
+  padding: 6px 10px 8px 16px;
+  background: rgba(0,0,0,0.15);
+}
+.tpl-detail-title {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim, #9aa4af);
+  margin: 4px 0 2px;
+}
+.tpl-incl {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--accent, #4da3ff);
+  cursor: pointer;
+  padding: 1px 0;
+}
+.tpl-incl:hover {
+  text-decoration: underline;
+}
+.tpl-incl.broken {
+  color: #f85149;
+}
+.tpl-path {
+  margin-top: 4px;
+  font-size: 9.5px;
+  color: var(--text-dim, #9aa4af);
+  word-break: break-all;
+}
+
 /* Celery tasks */
 .task-item {
   padding: 8px 10px;
