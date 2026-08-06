@@ -3819,6 +3819,7 @@
       { label: 'View: Toggle ASGI / Routing', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="asgi"]').classList.add('active'); $('#panel-asgi').classList.add('active'); nautRefreshAsgi(); }, category: 'View' },
       { label: 'View: Toggle Manage Commands', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="commands"]').classList.add('active'); $('#panel-commands').classList.add('active'); nautRefreshCommands(); }, category: 'View' },
       { label: 'View: Toggle Middleware', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="mw"]').classList.add('active'); $('#panel-mw').classList.add('active'); nautRefreshMw(); }, category: 'View' },
+      { label: 'View: Toggle Translations / i18n', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="i18n"]').classList.add('active'); $('#panel-i18n').classList.add('active'); nautRefreshI18n(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -5317,6 +5318,7 @@
     nautRefreshAsgi();
     nautRefreshCommands();
     nautRefreshMw();
+    nautRefreshI18n();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -6663,6 +6665,93 @@
     });
   }
 
+  // ── i18n / Translations Inspector ──────────────────────────────────────
+  let _i18nData = null;
+  let _i18nFilter = '';
+
+  async function nautRefreshI18n() {
+    if (!currentFolder) return;
+    const el = $('#i18n-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Scanning translation catalogs…</p></div>';
+    let res;
+    try { res = await window.api.i18n.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(String(data.error).split('\n').pop()) + '</p></div>'; return; }
+    _i18nData = data;
+    nautRenderI18n();
+  }
+
+  function nautRenderI18n() {
+    const el = $('#i18n-body');
+    if (!el) return;
+    const st = $('#i18n-status');
+    const data = _i18nData;
+    if (!data || !Array.isArray(data.poFiles)) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>No translation data.</p></div>';
+      return;
+    }
+    const q = _i18nFilter.toLowerCase();
+    const match = (s) => !q || (s || '').toLowerCase().includes(q);
+    if (st) {
+      const parts = [data.poFiles.length + ' catalogs', data.totalTranslated + ' translated', data.totalUntranslated + ' untranslated'];
+      if (data.missingCount) parts.push(data.missingCount + ' missing in code');
+      st.textContent = parts.join(' · ');
+    }
+    let html = '';
+    const files = data.poFiles.filter((f) => match(f.lang) || match(f.file));
+    if (files.length) {
+      html += '<div class="orm-subtitle">Catalogs (' + files.length + ')</div>';
+      for (const f of files) {
+        const pct = f.percent || 0;
+        const warn = f.untranslated > 0 || pct < 100;
+        html += '<div class="cmd-row"' + (f.path ? ' data-open="' + escapeHtml(f.path) + '"' : '') + '>' +
+          '<div class="cmd-line"><span class="cmd-name">' + escapeHtml(f.lang || '?') + '</span>' +
+          '<span class="cmd-chip">' + pct + '%</span>' +
+          (f.untranslated ? '<span class="cmd-chip mw-idx">' + f.untranslated + ' untranslated</span>' : '') +
+          (f.fuzzy ? '<span class="cmd-chip i18n-fuzzy">' + f.fuzzy + ' fuzzy</span>' : '') +
+          (f.obsolete ? '<span class="cmd-chip i18n-obsolete">' + f.obsolete + ' obsolete</span>' : '') +
+          '</div>' +
+          '<div class="i18n-bar"><div class="i18n-bar-fill" style="width:' + Math.max(pct, 2) + '%"></div></div>' +
+          '<div class="sec-file">' + escapeHtml(f.file) + '</div>' +
+          '</div>';
+      }
+    } else {
+      html += '<div class="orm-subtitle">Catalogs</div><div class="bug-empty"><p>No .po catalogs found. Run <code>makemessages -l &lt;lang&gt;</code> to create one.</p></div>';
+    }
+    if (data.missing && data.missing.length) {
+      const miss = data.missing.filter((s) => match(s));
+      if (miss.length) {
+        html += '<div class="orm-subtitle">Missing from catalogs (' + miss.length + ')</div>';
+        html += '<div class="i18n-missing">';
+        for (const s of miss) html += '<span class="i18n-miss-item" title="' + escapeHtml(s) + '">' + escapeHtml(s) + '</span>';
+        html += '</div>';
+      }
+    }
+    const templ = data.usage && data.usage.templates ? data.usage.templates.filter((u) => match(u.file)) : [];
+    const py = data.usage && data.usage.python ? data.usage.python.filter((u) => match(u.file)) : [];
+    if (templ.length || py.length) {
+      html += '<div class="orm-subtitle">Usage</div>';
+      if (templ.length) {
+        html += '<details class="cmd-builtin"><summary>Templates (' + templ.length + ')</summary>';
+        for (const u of templ) html += '<div class="cmd-row"' + (u.file ? ' data-open="' + escapeHtml(u.file) + '"' : '') + '><div class="cmd-line"><span class="cmd-name">' + escapeHtml(u.file) + '</span><span class="cmd-chip mw-idx">' + u.count + '</span></div></div>';
+        html += '</details>';
+      }
+      if (py.length) {
+        html += '<details class="cmd-builtin"><summary>Python (' + py.length + ')</summary>';
+        for (const u of py) html += '<div class="cmd-row"' + (u.file ? ' data-open="' + escapeHtml(u.file) + '"' : '') + '><div class="cmd-line"><span class="cmd-name">' + escapeHtml(u.file) + '</span><span class="cmd-chip mw-idx">' + u.count + '</span></div></div>';
+        html += '</details>';
+      }
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-open]').forEach((row) => {
+      if (!row.dataset.open) return;
+      row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
+    });
+  }
+
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
@@ -6713,6 +6802,8 @@
   $('#btn-commands-refresh')?.addEventListener('click', nautRefreshCommands);
   $('#mw-search')?.addEventListener('input', (e) => { _mwFilter = e.target.value; nautRenderMw(); });
   $('#btn-mw-refresh')?.addEventListener('click', nautRefreshMw);
+  $('#i18n-search')?.addEventListener('input', (e) => { _i18nFilter = e.target.value; nautRenderI18n(); });
+  $('#btn-i18n-refresh')?.addEventListener('click', nautRefreshI18n);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

@@ -203,6 +203,13 @@
             <path d="M12 2 2 7l10 5 10-5z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="i18n" title="Translations / i18n">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M2 12h20"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </button>
       </div>
       <div class="activity-bar-bottom">
         <button class="activity-icon" id="btn-settings" title="Settings (Ctrl+,)">
@@ -1098,6 +1105,35 @@
               <path d="M12 2 2 7l10 5 10-5z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>
             </svg>
             <p>Open a Django project to inspect its middleware pipeline.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- i18n Panel -->
+      <div class="sidebar-panel" id="panel-i18n">
+        <div class="sidebar-header">
+          <span>TRANSLATIONS</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-i18n-refresh" title="Rescan translations">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="log-toolbar">
+          <input id="i18n-search" type="text" placeholder="Filter language or string…" spellcheck="false">
+          <span class="mail-status" id="i18n-status"></span>
+        </div>
+        <div class="sidebar-body" id="i18n-body">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            <p>Open a Django project to inspect its translation catalogs.</p>
           </div>
         </div>
       </div>

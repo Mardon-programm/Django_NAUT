@@ -3217,6 +3217,47 @@ body {
   background: rgba(210, 168, 255, 0.1);
 }
 
+/* i18n / Translations Inspector */
+.i18n-bar {
+  height: 4px;
+  background: rgba(128, 128, 128, 0.15);
+  border-radius: 2px;
+  margin: 4px 0;
+  overflow: hidden;
+}
+.i18n-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4da3ff, #7ee787);
+  border-radius: 2px;
+}
+.i18n-fuzzy {
+  color: #f0c674;
+  background: rgba(240, 198, 116, 0.1);
+}
+.i18n-obsolete {
+  color: var(--text-dim, #9aa4af);
+  background: rgba(128, 128, 128, 0.15);
+}
+.i18n-missing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 10px 10px;
+}
+.i18n-miss-item {
+  font-size: 10.5px;
+  font-family: var(--mono, 'Cascadia Code', Consolas, monospace);
+  color: #ff7b72;
+  background: rgba(255, 123, 114, 0.1);
+  border: 1px solid rgba(255, 123, 114, 0.25);
+  border-radius: 3px;
+  padding: 1px 6px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Settings & Env Inspector */
 .cfg-section {
   border-bottom: 1px solid rgba(128,128,128,0.08);
