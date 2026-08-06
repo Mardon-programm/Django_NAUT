@@ -3816,6 +3816,7 @@
       { label: 'View: Toggle API Client', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="apiclient"]').classList.add('active'); $('#panel-apiclient').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle Forms', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="forms"]').classList.add('active'); $('#panel-forms').classList.add('active'); nautRefreshForms(); }, category: 'View' },
       { label: 'View: Toggle Static Files', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="static"]').classList.add('active'); $('#panel-static').classList.add('active'); nautRefreshStatic(); }, category: 'View' },
+      { label: 'View: Toggle ASGI / Routing', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="asgi"]').classList.add('active'); $('#panel-asgi').classList.add('active'); nautRefreshAsgi(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -5203,6 +5204,7 @@
     nautRefreshTpl();
     nautRefreshForms();
     nautRefreshStatic();
+    nautRefreshAsgi();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -6293,6 +6295,107 @@
       row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
     });
   }
+
+  // ── ASGI / Routing Inspector ───────────────────────────────────────────
+  let _asgiData = null;
+  let _asgiFilter = '';
+
+  async function nautRefreshAsgi() {
+    if (!currentFolder) return;
+    const el = $('#asgi-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Introspecting ASGI app…</p></div>';
+    let res;
+    try { res = await window.api.asgi.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(data.error.split('\n').pop()) + '</p></div>'; return; }
+    _asgiData = data;
+    nautRenderAsgi();
+  }
+
+  function nautRenderAsgi() {
+    const el = $('#asgi-body');
+    if (!el) return;
+    const st = $('#asgi-status');
+    const data = _asgiData;
+    if (!data) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>No ASGI data.</p></div>';
+      return;
+    }
+    if (data.exists === false) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>No asgi.py in this project (' + escapeHtml(data.asgiPath || 'unknown') + ').</p></div>';
+      return;
+    }
+    const q = _asgiFilter.toLowerCase();
+    const match = (s) => !q || (s || '').toLowerCase().includes(q);
+    const ws = (data.wsRoutes || []).filter((r) => match(r.pattern) || match(r.target) || (r.name || '').toLowerCase().includes(q) || (r.methods || []).some(match));
+    const http = (data.httpRoutes || []).filter((r) => match(r.pattern) || match(r.target));
+    const cons = (data.consumers || []).filter((c) => match(c.name) || match(c.module) || (c.methods || []).some(match));
+    if (st) {
+      const parts = [data.appType || 'ASGI app'];
+      if (data.protocols && data.protocols.length) parts.push(data.protocols.join(', '));
+      parts.push((data.httpRoutes || []).length + ' http', (data.wsRoutes || []).length + ' ws');
+      if (data.consumers && data.consumers.length) parts.push(data.consumers.length + ' consumers');
+      if (data.errors && data.errors.length) parts.push(data.errors.length + ' errors');
+      st.textContent = parts.join(' · ');
+    }
+    let html = '<div class="mig-summary">' + escapeHtml(data.asgiPath || '') + '</div>' +
+      '<div class="mig-summary">' + escapeHtml(data.appType || '') +
+      (data.protocols && data.protocols.length ? ' · protocols: ' + data.protocols.map((p) => '<span class="asgi-proto">' + escapeHtml(p) + '</span>').join(' ') : '') +
+      (q ? ' · filtered' : '') + '</div>';
+
+    if (data.errors && data.errors.length) {
+      for (const e of data.errors) html += '<div class="tpl-shadowed">⚠ ' + escapeHtml(String(e).split('\n').slice(-2).join(' | ').slice(0, 200)) + '</div>';
+    }
+
+    if (ws.length) {
+      html += '<div class="orm-subtitle">WebSocket routes (' + (data.wsRoutes || []).length + ')</div>';
+      for (const r of ws) {
+        html += '<div class="asgi-route">' +
+          '<span class="asgi-route-pattern">' + escapeHtml(r.pattern || '(default)') + '</span>' +
+          '<span class="asgi-route-target" data-open="' + escapeHtml(r.file || '') + '">→ ' + escapeHtml(r.target || '?') + '</span>' +
+          (r.methods && r.methods.length ? '<span class="asgi-route-methods">' + r.methods.map((m) => '<span class="asgi-method">' + escapeHtml(m) + '</span>').join('') + '</span>' : '') +
+          (r.groups && r.groups.length ? '<span class="asgi-route-groups">groups: ' + escapeHtml(r.groups.join(', ')) + '</span>' : '') +
+          '</div>';
+      }
+    } else if (!q) {
+      html += '<div class="orm-subtitle">WebSocket routes</div><div class="bug-empty"><p>No WebSocket routes. Add channels or extend the ASGI app.</p></div>';
+    }
+
+    if (http.length) {
+      html += '<div class="orm-subtitle">HTTP routes (' + (data.httpRoutes || []).length + ')</div>';
+      for (const r of http) {
+        html += '<div class="asgi-route"><span class="asgi-route-pattern">' + escapeHtml(r.pattern || '(root)') + '</span>' +
+          '<span class="asgi-route-target">→ ' + escapeHtml(r.target || '?') + '</span></div>';
+      }
+    }
+
+    if (cons.length) {
+      html += '<div class="orm-subtitle">Consumers (' + (data.consumers || []).length + ')</div>';
+      for (const c of cons) {
+        html += '<div class="asgi-consumer" data-open="' + escapeHtml(c.file || '') + '">' +
+          '<span class="asgi-consumer-name">' + escapeHtml(c.name) + '</span>' +
+          '<span class="asgi-consumer-mod">' + escapeHtml(c.module) + '</span>' +
+          (c.methods && c.methods.length ? '<span class="asgi-consumer-methods">' + c.methods.map((m) => '<span class="asgi-method">' + escapeHtml(m) + '</span>').join('') + '</span>' : '') +
+          (c.groups && c.groups.length ? '<span class="asgi-consumer-groups">groups: ' + escapeHtml(c.groups.join(', ')) + '</span>' : '') +
+          '</div>';
+      }
+    } else if (!q) {
+      html += '<div class="orm-subtitle">Consumers</div><div class="bug-empty"><p>No channel consumers found.</p></div>';
+    }
+
+    if (!ws.length && !http.length && !cons.length && !data.errors) {
+      html += '<div class="bug-empty"><p>No routes detected inside the ASGI application.</p></div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-open]').forEach((row) => {
+      if (!row.dataset.open) return;
+      row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
+    });
+  }
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
@@ -6337,6 +6440,8 @@
   $('#btn-forms-refresh')?.addEventListener('click', nautRefreshForms);
   $('#static-search')?.addEventListener('input', (e) => { _staticFilter = e.target.value; nautRenderStatic(); });
   $('#btn-static-refresh')?.addEventListener('click', nautRefreshStatic);
+  $('#asgi-search')?.addEventListener('input', (e) => { _asgiFilter = e.target.value; nautRenderAsgi(); });
+  $('#btn-asgi-refresh')?.addEventListener('click', nautRefreshAsgi);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

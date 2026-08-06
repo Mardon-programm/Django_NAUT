@@ -3010,6 +3010,85 @@ body {
   color: var(--text-dim, #9aa4af);
 }
 
+/* ASGI / Routing Inspector */
+.asgi-proto {
+  font-size: 9px;
+  color: var(--green, #4ec9b0);
+  background: rgba(78, 201, 176, 0.12);
+  border: 1px solid rgba(78, 201, 176, 0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--font-mono, monospace);
+}
+.asgi-route {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 10.5px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.06);
+}
+.asgi-route-pattern {
+  font-family: var(--font-mono, monospace);
+  color: var(--accent, #4da3ff);
+}
+.asgi-route-target {
+  color: var(--yellow, #f5c14b);
+  cursor: pointer;
+}
+.asgi-route-target[data-open]:hover {
+  text-decoration: underline;
+}
+.asgi-route-methods {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-left: auto;
+}
+.asgi-route-groups {
+  font-size: 9px;
+  color: var(--text-dim, #9aa4af);
+}
+.asgi-method {
+  font-size: 8px;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(128, 128, 128, 0.2);
+  color: var(--text-dim, #9aa4af);
+  font-family: var(--font-mono, monospace);
+}
+.asgi-consumer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.06);
+  cursor: pointer;
+}
+.asgi-consumer:hover .asgi-consumer-name {
+  color: var(--accent, #4da3ff);
+}
+.asgi-consumer-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text, #d6dde3);
+}
+.asgi-consumer-mod {
+  font-size: 9px;
+  color: var(--text-dim, #9aa4af);
+}
+.asgi-consumer-methods {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.asgi-consumer-groups {
+  font-size: 9px;
+  color: var(--text-dim, #9aa4af);
+}
+
 /* Settings & Env Inspector */
 .cfg-section {
   border-bottom: 1px solid rgba(128,128,128,0.08);

@@ -187,6 +187,12 @@
             <line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="asgi" title="ASGI / Routing">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/>
+            <path d="M8 6h8M7.5 7.5 11 16M16.5 7.5 13 16"/>
+          </svg>
+        </button>
       </div>
       <div class="activity-bar-bottom">
         <button class="activity-icon" id="btn-settings" title="Settings (Ctrl+,)">
@@ -1000,6 +1006,34 @@
               <line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/>
             </svg>
             <p>Open a Django project to inspect its static files.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ASGI / Routing Inspector Panel -->
+      <div class="sidebar-panel" id="panel-asgi">
+        <div class="sidebar-header">
+          <span>ASGI / ROUTING</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-asgi-refresh" title="Rescan ASGI app">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="log-toolbar">
+          <input id="asgi-search" type="text" placeholder="Filter routes / consumers…" spellcheck="false">
+          <span class="mail-status" id="asgi-status"></span>
+        </div>
+        <div class="sidebar-body" id="asgi-body">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/>
+              <path d="M8 6h8M7.5 7.5 11 16M16.5 7.5 13 16"/>
+            </svg>
+            <p>Open a Django project to inspect its ASGI app.</p>
           </div>
         </div>
       </div>
