@@ -6,12 +6,19 @@
 
 const { spawn } = require('node:child_process');
 const http = require('node:http');
+const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
 const { WebSocketServer } = require('ws');
 
 const AGENT_DIR = process.env.DJANGONAUT_AGENT_DIR || path.join(__dirname, 'python-agent');
 const PYTHON = process.env.DJANGONAUT_PYTHON || 'python';
+
+function mailDirFor(cwd) {
+  const key = path.resolve(cwd || os.homedir()).replace(/\//g, '\\');
+  const hash = crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
+  return path.join(os.tmpdir(), 'django_naut_mail', hash);
+}
 
 const server = http.createServer();
 const wss = new WebSocketServer({ server });
@@ -95,6 +102,8 @@ function startChild(opts) {
     ...process.env,
     PYTHONIOENCODING: 'utf-8',
     DJANGONAUT_AGENT_DIR: AGENT_DIR,
+    DJANGO_NAUT_MAIL_CAPTURE: '1',
+    DJANGO_NAUT_MAIL_FILE: mailDirFor(cwd),
   };
   if (AGENT_DIR) {
     env.PYTHONPATH = AGENT_DIR + (process.env.PYTHONPATH ? path.delimiter + process.env.PYTHONPATH : '');

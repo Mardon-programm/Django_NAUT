@@ -43,6 +43,25 @@ def main():
         import django
 
         django.setup()
+        if os.environ.get("DJANGO_NAUT_MAIL_CAPTURE"):
+            from django.conf import settings
+
+            if hasattr(settings, "MAILERS"):
+                mailers = settings.MAILERS
+                if isinstance(mailers, dict) and isinstance(
+                    mailers.get("default"), dict
+                ):
+                    mailers["default"]["BACKEND"] = (
+                        "django_naut.mail_capture.EmailBackend"
+                    )
+                else:
+                    settings.MAILERS = {
+                        "default": {
+                            "BACKEND": "django_naut.mail_capture.EmailBackend"
+                        }
+                    }
+            else:
+                settings.EMAIL_BACKEND = "django_naut.mail_capture.EmailBackend"
         from django_naut.management.commands.runserver_naut import run
 
         run(args[1:])

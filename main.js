@@ -4,6 +4,7 @@ const { spawn, exec } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const https = require('node:https');
+const crypto = require('node:crypto');
 
 const { scanProject } = require('./django-scanner');
 const { runBugHunter } = require('./bughunter');
@@ -382,6 +383,51 @@ function startLogServer(agentDir) {
 }
 
 ipcMain.handle('logs:getPort', () => logPort);
+
+// ── Mail Capture Inspector ─────────────────────────────────────────────────
+
+function mailDirFor(root) {
+  const key = path.resolve(root || os.homedir()).replace(/\//g, '\\');
+  const hash = crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
+  return path.join(os.tmpdir(), 'django_naut_mail', hash);
+}
+
+ipcMain.handle('mail:list', async (_event, root) => {
+  const dir = mailDirFor(root);
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const f of fs.readdirSync(dir)) {
+    if (!f.endsWith('.json')) continue;
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+      out.push({
+        id: data.id,
+        subject: data.subject,
+        from: data.from,
+        to: data.to || [],
+        date: data.date,
+        textLen: (data.text || '').length,
+        html: !!data.html,
+        attachments: data.attachments || [],
+      });
+    } catch {}
+  }
+  out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  return out;
+});
+
+ipcMain.handle('mail:read', async (_event, { root, id }) => {
+  const dir = mailDirFor(root);
+  const p = path.join(dir, path.basename(id) + '.json');
+  if (!p.startsWith(dir + path.sep) || !fs.existsSync(p)) return null;
+  return JSON.parse(fs.readFileSync(p, 'utf8'));
+});
+
+ipcMain.handle('mail:clear', async (_event, root) => {
+  const dir = mailDirFor(root);
+  if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+  return true;
+});
 
 // ── System ─────────────────────────────────────────────────────────────────
 

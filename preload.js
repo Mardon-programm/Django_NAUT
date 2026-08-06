@@ -163,6 +163,12 @@ contextBridge.exposeInMainWorld('api', {
     scan: (root) => ipcRenderer.invoke('cfg:scan', root),
   },
 
+  mail: {
+    list: (root) => ipcRenderer.invoke('mail:list', root),
+    read: (id, root) => ipcRenderer.invoke('mail:read', { root, id }),
+    clear: (root) => ipcRenderer.invoke('mail:clear', root),
+  },
+
   tests: {
     scan: (root) => ipcRenderer.invoke('test:scan', root),
     run: (opts) => ipcRenderer.invoke('test:run', opts),

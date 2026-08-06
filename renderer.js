@@ -5076,6 +5076,7 @@
     nautRefreshUrls();
     nautRefreshOrm();
     nautRefreshCfg();
+    nautRefreshMail();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -5758,6 +5759,95 @@
     });
   }
 
+  // ── Mail Inspector ──────────────────────────────────────────────────────
+  let _mailEmails = [];
+  let _mailFilter = '';
+  let _mailDetail = null;
+
+  async function nautRefreshMail() {
+    if (!currentFolder) return;
+    const el = $('#mail-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Reading captured emails…</p></div>';
+    let list;
+    try { list = await window.api.mail.list(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    _mailEmails = list || [];
+    _mailDetail = null;
+    nautRenderMail();
+  }
+
+  function nautRenderMail() {
+    const el = $('#mail-body');
+    if (!el) return;
+    const q = _mailFilter.toLowerCase();
+    const rows = _mailEmails.filter((m) =>
+      !q || (m.subject || '').toLowerCase().includes(q) ||
+      (m.from || '').toLowerCase().includes(q) ||
+      (m.to || []).join(', ').toLowerCase().includes(q)
+    );
+    const st = $('#mail-status');
+    if (st) st.textContent = _mailEmails.length ? _mailEmails.length + ' captured' : '';
+    if (!rows.length) {
+      el.innerHTML = '<div class="bug-empty"><p>' + (q ? 'No matching emails.' : 'No emails captured yet.<br>Start the server in Live Logs, then send mail from the app.') + '</p></div>';
+      return;
+    }
+    let html = '';
+    for (const m of rows) {
+      const open = _mailDetail === m.id;
+      html += '<div class="mail-item' + (open ? ' open' : '') + '">' +
+        '<div class="mail-item-head" data-id="' + escapeHtml(m.id) + '">' +
+          '<div class="mail-subject">' + escapeHtml(m.subject) + (m.attachments && m.attachments.length ? ' <span class="mail-clip">\uD83D\uDCCE' + m.attachments.length + '</span>' : '') + '</div>' +
+          '<div class="mail-meta">' + escapeHtml(m.from || '') + ' → ' + escapeHtml((m.to || []).join(', ')) + '</div>' +
+          '<div class="mail-date">' + escapeHtml((m.date || '').replace('T', ' ').slice(0, 19)) + '</div>' +
+        '</div>' +
+        (open ? '<div class="mail-detail" id="mail-detail-' + escapeHtml(m.id) + '"></div>' : '') +
+      '</div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.mail-item-head').forEach((head) => {
+      head.addEventListener('click', () => nautOpenMail(head.dataset.id));
+    });
+    if (_mailDetail) nautOpenMail(_mailDetail, true);
+  }
+
+  async function nautOpenMail(id, force) {
+    if (!id) return;
+    if (_mailDetail === id && !force) { _mailDetail = null; nautRenderMail(); return; }
+    _mailDetail = id;
+    nautRenderMail();
+    const box = $('#mail-detail-' + id);
+    if (!box) return;
+    box.innerHTML = '<div class="bug-empty"><p>Loading…</p></div>';
+    let m;
+    try { m = await window.api.mail.read(id, currentFolder); } catch (e) { box.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (!m) { box.innerHTML = '<div class="bug-empty"><p>Mail file missing.</p></div>'; return; }
+    const rcpt = ['to', 'cc', 'bcc'].map((k) => m[k] && m[k].length ? k.toUpperCase() + ': ' + m[k].join(', ') : '').filter(Boolean).join('<br>');
+    const att = (m.attachments || []).map((a) => '<div class="mail-att">' + escapeHtml(a.name) + ' <span class="muted">' + escapeHtml(a.type) + ' · ' + a.size + ' B</span></div>').join('');
+    let body = '';
+    if (m.html) {
+      const safe = String(m.html).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      body = '<iframe class="mail-html" sandbox="" src="about:blank" srcdoc="' + safe + '"></iframe>';
+    } else {
+      body = '<pre class="mail-text">' + escapeHtml(m.text || '') + '</pre>';
+    }
+    box.innerHTML =
+      '<div class="mail-headers">' +
+        '<div class="mail-hdr"><span>Subject</span>' + escapeHtml(m.subject || '') + '</div>' +
+        '<div class="mail-hdr"><span>From</span>' + escapeHtml(m.from || '') + '</div>' +
+        (rcpt ? '<div class="mail-hdr"><span>Recipients</span>' + rcpt + '</div>' : '') +
+        '<div class="mail-hdr"><span>Date</span>' + escapeHtml(m.date || '') + '</div>' +
+        (m.reply_to && m.reply_to.length ? '<div class="mail-hdr"><span>Reply-To</span>' + escapeHtml(m.reply_to.join(', ')) + '</div>' : '') +
+        (att ? '<div class="mail-hdr"><span>Attachments</span>' + att + '</div>' : '') +
+      '</div>' + body;
+  }
+
+  async function nautClearMail() {
+    if (!currentFolder) return;
+    if (_mailEmails.length && !confirm('Clear ' + _mailEmails.length + ' captured email(s)?')) return;
+    try { await window.api.mail.clear(currentFolder); } catch {}
+    nautRefreshMail();
+  }
+
   // ── Wire up ─────────────────────────────────────────────────────────────
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
@@ -5787,6 +5877,9 @@
   $('#btn-orm-refresh')?.addEventListener('click', nautRefreshOrm);
   $('#cfg-search')?.addEventListener('input', (e) => { _cfgFilter = e.target.value; nautRenderCfg(); });
   $('#btn-cfg-refresh')?.addEventListener('click', nautRefreshCfg);
+  $('#mail-search')?.addEventListener('input', (e) => { _mailFilter = e.target.value; nautRenderMail(); });
+  $('#btn-mail-refresh')?.addEventListener('click', nautRefreshMail);
+  $('#btn-mail-clear')?.addEventListener('click', nautClearMail);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();
