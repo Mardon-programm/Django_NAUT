@@ -4693,6 +4693,14 @@
   const nautProfSlowThreshold = 200;
   let nautProfTimer = null;
 
+  // ── Live HTTP Request Inspector ─────────────────────────────────────────
+  let nautReqList = [];
+  let nautReqFilter = '';
+  let nautReqExpanded = null;
+  let nautReqAuto = true;
+  let nautReqTimer = null;
+  let nautReqCounter = 0;
+
   function nautProfilerIngest(payload) {
     const qs = payload.queries || [];
     const view = payload.view || payload.path || '?';
@@ -4712,7 +4720,120 @@
       }
     }
     if (nautProfSlowQueries.length > 100) nautProfSlowQueries = nautProfSlowQueries.slice(-100);
+    nautReqIngest(payload);
     nautScheduleProfilerRender();
+  }
+
+  function nautReqIngest(payload) {
+    nautReqList.push({
+      id: ++nautReqCounter,
+      ts: Date.now(),
+      method: payload.method || 'GET',
+      path: payload.path || '/',
+      view: payload.view || '',
+      status: payload.status != null ? payload.status : 200,
+      user: payload.user || 'anon',
+      ms: payload.requestTime || 0,
+      q: payload.totalQueries || 0,
+      sqlMs: payload.totalTime || 0,
+      queries: payload.queries || [],
+    });
+    if (nautReqList.length > 200) nautReqList = nautReqList.slice(-200);
+    if (nautReqTimer) return;
+    nautReqTimer = setTimeout(() => {
+      nautReqTimer = null;
+      nautRenderRequests();
+    }, 300);
+  }
+
+  function nautReqStatusCls(s) {
+    if (s >= 500) return 'req-s5';
+    if (s >= 400) return 'req-s4';
+    if (s >= 300) return 'req-s3';
+    return 'req-s2';
+  }
+
+  function nautRenderRequests() {
+    const el = $('#req-body');
+    if (!el) return;
+    const q = nautReqFilter.toLowerCase();
+    const rows = q
+      ? nautReqList.filter((r) =>
+          r.path.toLowerCase().includes(q) || (r.view || '').toLowerCase().includes(q) ||
+          r.method.toLowerCase().includes(q) || r.user.toLowerCase().includes(q) ||
+          String(r.status).includes(q))
+      : nautReqList;
+    const st = $('#req-status');
+    if (st) st.textContent = nautReqList.length ? nautReqList.length + ' reqs' : '';
+    if (!rows.length) {
+      el.innerHTML = '<div class="bug-empty"><p>' + (q ? 'No matching requests.' : 'No requests captured yet.') +
+        '<br><span class="muted">Start the dev server via Live Logs and open pages in the browser.</span></p></div>';
+      return;
+    }
+    let html = '<div class="req-table">';
+    for (const r of rows) {
+      const open = nautReqExpanded === r.id;
+      const cls = nautReqStatusCls(r.status);
+      html += '<div class="req-row' + (open ? ' open' : '') + '" data-id="' + r.id + '">' +
+        '<div class="req-line">' +
+          '<span class="req-time">' + escapeHtml(new Date(r.ts).toLocaleTimeString('en-US', { hour12: false })) + '</span>' +
+          '<span class="req-status ' + cls + '">' + r.status + '</span>' +
+          '<span class="req-method ' + nautReqMethodCls(r.method) + '">' + escapeHtml(r.method) + '</span>' +
+          '<span class="req-path">' + escapeHtml(r.path) + (r.view ? ' <span class="req-view">' + escapeHtml(r.view) + '</span>' : '') + '</span>' +
+          '<span class="req-ms">' + (r.ms >= 1000 ? (r.ms / 1000).toFixed(1) + 's' : r.ms.toFixed(0) + 'ms') + '</span>' +
+          '<span class="req-q">' + (r.q ? r.q + ' SQL' : '') + '</span>' +
+          (r.user !== 'anon' ? '<span class="req-user">' + escapeHtml(r.user) + '</span>' : '') +
+        '</div>' +
+        (open ? '<div class="req-detail" id="req-detail-' + r.id + '"></div>' : '') +
+      '</div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+    el.querySelectorAll('.req-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const id = parseInt(row.dataset.id, 10);
+        if (nautReqExpanded === id) nautReqExpanded = null;
+        else nautReqExpanded = id;
+        nautRenderRequests();
+        if (nautReqExpanded === id) nautRenderReqDetail(id);
+      });
+    });
+    if (nautReqAuto) el.scrollTop = el.scrollHeight;
+  }
+
+  function nautReqMethodCls(m) {
+    return { GET: 'req-m-get', POST: 'req-m-post', PUT: 'req-m-put', PATCH: 'req-m-patch', DELETE: 'req-m-del', HEAD: 'req-m-get', OPTIONS: 'req-m-get' }[m] || '';
+  }
+
+  function nautRenderReqDetail(id) {
+    const box = $('#req-detail-' + id);
+    if (!box) return;
+    const r = nautReqList.find((x) => x.id === id);
+    if (!r) return;
+    if (!r.queries.length) { box.innerHTML = '<div class="req-no-sql">No SQL queries executed.</div>'; return; }
+    const sorted = r.queries.slice().sort((a, b) => (b.time || 0) - (a.time || 0));
+    let html = '<div class="req-detail-title">' + r.q + ' queries · ' + r.sqlMs.toFixed(1) + 'ms total</div>';
+    for (const qr of sorted) {
+      const loc = qr.stack && qr.stack.file ? (qr.stack.file.split(/[/\\]/).pop() + ':' + qr.stack.line) : '';
+      html += '<div class="req-query' + ((qr.time || 0) >= nautProfSlowThreshold ? ' slow' : '') + '"' +
+        (qr.stack && qr.stack.file ? ' data-file="' + escapeHtml(qr.stack.file) + '" data-line="' + (qr.stack.line || 1) + '"' : '') + '>' +
+        '<span class="req-query-time">' + (qr.time || 0).toFixed(1) + 'ms</span> ' +
+        '<code>' + escapeHtml((qr.sql || '').replace(/\s+/g, ' ')) + '</code>' +
+        (loc ? '<div class="sec-file">' + escapeHtml(loc) + '</div>' : '') +
+      '</div>';
+    }
+    box.innerHTML = html;
+    box.querySelectorAll('.req-query').forEach((item) => {
+      item.addEventListener('click', () => {
+        if (item.dataset.file) nautGoto(item.dataset.file, parseInt(item.dataset.line, 10) || 1);
+      });
+    });
+  }
+
+  function nautClearRequests() {
+    nautReqList = [];
+    nautReqExpanded = null;
+    nautRenderRequests();
   }
 
   function nautScheduleProfilerRender() {
@@ -5880,6 +6001,13 @@
   $('#mail-search')?.addEventListener('input', (e) => { _mailFilter = e.target.value; nautRenderMail(); });
   $('#btn-mail-refresh')?.addEventListener('click', nautRefreshMail);
   $('#btn-mail-clear')?.addEventListener('click', nautClearMail);
+  $('#req-search')?.addEventListener('input', (e) => { nautReqFilter = e.target.value; nautRenderRequests(); });
+  $('#btn-req-clear')?.addEventListener('click', nautClearRequests);
+  $('#btn-req-scroll')?.addEventListener('click', () => {
+    nautReqAuto = !nautReqAuto;
+    const b = $('#btn-req-scroll');
+    if (b) b.classList.toggle('req-auto-on', nautReqAuto);
+  });
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

@@ -3031,6 +3031,122 @@ body {
   color: var(--text-dim, #9aa4af);
 }
 
+/* HTTP request inspector */
+.req-auto-on {
+  color: var(--accent, #4da3ff) !important;
+}
+.req-table {
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+}
+.req-row {
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+}
+.req-row.open .req-line {
+  background: rgba(77, 163, 255, 0.1);
+}
+.req-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+.req-line:hover {
+  background: rgba(77, 163, 255, 0.08);
+}
+.req-time {
+  color: var(--text-dim, #9aa4af);
+  font-size: 9.5px;
+  flex-shrink: 0;
+}
+.req-status {
+  font-weight: 700;
+  min-width: 28px;
+  text-align: center;
+  border-radius: 3px;
+  padding: 0 3px;
+  flex-shrink: 0;
+}
+.req-s2 { color: #3fb950; background: rgba(63,185,80,0.15); }
+.req-s3 { color: #58a6ff; background: rgba(88,166,255,0.15); }
+.req-s4 { color: #d29922; background: rgba(210,153,34,0.15); }
+.req-s5 { color: #f85149; background: rgba(248,81,73,0.15); }
+.req-method {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.req-m-get    { color: #3fb950; background: rgba(63,185,80,0.12); }
+.req-m-post   { color: #d29922; background: rgba(210,153,34,0.12); }
+.req-m-put    { color: #58a6ff; background: rgba(88,166,255,0.12); }
+.req-m-patch  { color: #bc8cff; background: rgba(188,140,255,0.12); }
+.req-m-del    { color: #f85149; background: rgba(248,81,73,0.12); }
+.req-path {
+  color: var(--text, #d6dde3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 60px;
+}
+.req-view {
+  color: var(--text-dim, #9aa4af);
+  font-size: 9.5px;
+}
+.req-ms {
+  color: var(--accent, #4da3ff);
+  flex-shrink: 0;
+}
+.req-q {
+  color: var(--yellow, #d29922);
+  font-size: 9.5px;
+  flex-shrink: 0;
+}
+.req-user {
+  color: #bc8cff;
+  font-size: 9.5px;
+  flex-shrink: 0;
+}
+.req-detail {
+  border-top: 1px solid rgba(128,128,128,0.12);
+  padding: 6px 8px;
+  background: rgba(0,0,0,0.15);
+}
+.req-no-sql {
+  color: var(--text-dim, #9aa4af);
+  font-size: 10.5px;
+}
+.req-detail-title {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim, #9aa4af);
+  margin-bottom: 4px;
+}
+.req-query {
+  padding: 3px 4px;
+  cursor: pointer;
+  border-radius: 3px;
+  word-break: break-word;
+}
+.req-query:hover {
+  background: rgba(77, 163, 255, 0.08);
+}
+.req-query.slow {
+  border-left: 2px solid var(--yellow, #d29922);
+}
+.req-query code {
+  color: var(--text, #d6dde3);
+}
+.req-query-time {
+  color: var(--yellow, #d29922);
+  font-size: 9.5px;
+}
+
 /* Celery tasks */
 .task-item {
   padding: 8px 10px;

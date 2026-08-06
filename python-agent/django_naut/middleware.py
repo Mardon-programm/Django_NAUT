@@ -76,38 +76,60 @@ class DjangoNautMiddleware(MiddlewareMixin):
         try:
             with connection.execute_wrapper(wrapper):
                 response = self.get_response(request)
+            status = getattr(response, "status_code", 200)
         except Exception as exc:
+            status = 500
             self._report_error(request, exc)
             raise
-
-        request_time = round((time.perf_counter() - request_start) * 1000, 2)
-        path = getattr(request, "path", "")
-        method = getattr(request, "method", "")
-        view = None
-        try:
-            view = getattr(request, "resolver_match", None)
-            if view:
-                view = getattr(view, "func", None)
-                view = getattr(view, "__name__", None) or getattr(view, "view_class", None).__name__
-        except Exception:
-            pass
-        client.send(
-            "sql",
-            {
-                "project": project,
-                "path": path,
-                "method": method,
-                "view": view,
-                "queries": queries,
-                "totalQueries": len(queries),
-                "requestTime": request_time,
-                "totalTime": round(sum(q["time"] for q in queries), 2),
-            },
-        )
+        finally:
+            request_time = round((time.perf_counter() - request_start) * 1000, 2)
+            path = getattr(request, "path", "")
+            method = getattr(request, "method", "")
+            view = None
+            try:
+                view = getattr(request, "resolver_match", None)
+                if view:
+                    view = getattr(view, "func", None)
+                    view = getattr(view, "__name__", None) or getattr(view, "view_class", None).__name__
+            except Exception:
+                pass
+            user = "anon"
+            try:
+                req_user = getattr(request, "user", None)
+                if req_user is not None and getattr(req_user, "is_authenticated", False):
+                    user = req_user.get_username() if hasattr(req_user, "get_username") else str(req_user)
+            except Exception:
+                pass
+            client.send(
+                "sql",
+                {
+                    "project": project,
+                    "path": path,
+                    "method": method,
+                    "view": view,
+                    "status": status,
+                    "user": user,
+                    "queries": queries,
+                    "totalQueries": len(queries),
+                    "requestTime": request_time,
+                    "totalTime": round(sum(q["time"] for q in queries), 2),
+                },
+            )
         return response
 
+    def process_exception(self, request, exception):
+        """Report unhandled exceptions.
+
+        Modern Django wraps each middleware in `convert_exception_to_response`,
+        so exceptions never propagate through our ``__call__``; they are turned
+        into 500 responses by the handler. `process_exception` is invoked while
+        the exception is still live, so we can report it here instead.
+        """
+        self._report_error(request, exception)
+        return None
+
     def _report_error(self, request, exc):
-        tb = traceback.format_exc()
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         frame = None
         for line in reversed(traceback.extract_tb(exc.__traceback__) or []):
             if "/django/" not in line.filename and "site-packages" not in line.filename:
