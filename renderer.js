@@ -4709,6 +4709,42 @@
   let nautReqTimer = null;
   let nautReqCounter = 0;
 
+  function nautNormalizeSql(sql) {
+    return String(sql || '')
+      .replace(/'[^']*'/g, '?')
+      .replace(/"[^"]*"/g, '?')
+      .replace(/\b\d+(?:\.\d+)?\b/g, '?')
+      .replace(/`[^`]*`/g, '`?`')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function nautReqAnalyze(r) {
+    const qs = r.queries || [];
+    const groups = new Map();
+    for (const q of qs) {
+      const key = nautNormalizeSql(q.sql);
+      if (!key) continue;
+      let g = groups.get(key);
+      if (!g) {
+        g = { key, sql: q.sql, count: 0, totalMs: 0, maxTime: 0, stack: q.stack };
+        groups.set(key, g);
+      }
+      g.count++;
+      g.totalMs += q.time || 0;
+      g.maxTime = Math.max(g.maxTime, q.time || 0);
+      if (!g.stack && q.stack) g.stack = q.stack;
+    }
+    const list = Array.from(groups.values()).sort((a, b) => b.count - a.count);
+    const n1 = list.filter((g) => g.count >= 5);
+    return {
+      distinct: list.length,
+      groups: list.filter((g) => g.count >= 2),
+      n1,
+      n1Queries: n1.reduce((a, g) => a + g.count, 0),
+    };
+  }
+
   function nautProfilerIngest(payload) {
     const qs = payload.queries || [];
     const view = payload.view || payload.path || '?';
@@ -4774,7 +4810,8 @@
           String(r.status).includes(q))
       : nautReqList;
     const st = $('#req-status');
-    if (st) st.textContent = nautReqList.length ? nautReqList.length + ' reqs' : '';
+    const n1Reqs = rows.reduce((a, r) => a + (nautReqAnalyze(r).n1.length ? 1 : 0), 0);
+    if (st) st.textContent = nautReqList.length ? nautReqList.length + ' reqs' + (n1Reqs ? ' · N+1: ' + n1Reqs : '') : '';
     if (!rows.length) {
       el.innerHTML = '<div class="bug-empty"><p>' + (q ? 'No matching requests.' : 'No requests captured yet.') +
         '<br><span class="muted">Start the dev server via Live Logs and open pages in the browser.</span></p></div>';
@@ -4784,7 +4821,8 @@
     for (const r of rows) {
       const open = nautReqExpanded === r.id;
       const cls = nautReqStatusCls(r.status);
-      html += '<div class="req-row' + (open ? ' open' : '') + '" data-id="' + r.id + '">' +
+      const a = nautReqAnalyze(r);
+      html += '<div class="req-row' + (open ? ' open' : '') + (a.n1.length ? ' n1' : '') + '" data-id="' + r.id + '">' +
         '<div class="req-line">' +
           '<span class="req-time">' + escapeHtml(new Date(r.ts).toLocaleTimeString('en-US', { hour12: false })) + '</span>' +
           '<span class="req-status ' + cls + '">' + r.status + '</span>' +
@@ -4792,6 +4830,7 @@
           '<span class="req-path">' + escapeHtml(r.path) + (r.view ? ' <span class="req-view">' + escapeHtml(r.view) + '</span>' : '') + '</span>' +
           '<span class="req-ms">' + (r.ms >= 1000 ? (r.ms / 1000).toFixed(1) + 's' : r.ms.toFixed(0) + 'ms') + '</span>' +
           '<span class="req-q">' + (r.q ? r.q + ' SQL' : '') + '</span>' +
+          (a.n1.length ? '<span class="req-n1" title="' + a.n1Queries + ' repeated queries in ' + a.n1.length + ' patterns">N+1</span>' : '') +
           (r.user !== 'anon' ? '<span class="req-user">' + escapeHtml(r.user) + '</span>' : '') +
         '</div>' +
         (open ? '<div class="req-detail" id="req-detail-' + r.id + '"></div>' : '') +
@@ -4867,8 +4906,23 @@
     if (!r.queries.length) {
       html += '<div class="req-no-sql">' + (ri ? 'No SQL queries executed.' : 'No request data or SQL queries.') + '</div>';
     } else {
-      const sorted = r.queries.slice().sort((a, b) => (b.time || 0) - (a.time || 0));
-      html += '<div class="req-detail-title">' + r.q + ' queries · ' + r.sqlMs.toFixed(1) + 'ms total</div>';
+      const a = nautReqAnalyze(r);
+      const sorted = r.queries.slice().sort((x, y) => (y.time || 0) - (x.time || 0));
+      html += '<div class="req-detail-title">' + r.q + ' queries · ' + r.sqlMs.toFixed(1) + 'ms total · ' + a.distinct + ' distinct</div>';
+      if (a.n1.length) {
+        html += '<div class="req-n1-block"><div class="req-n1-title">\u26A0 Possible N+1 · ' + a.n1.length + ' pattern' + (a.n1.length > 1 ? 's' : '') + ' · ' + a.n1Queries + ' repeated queries</div>';
+        for (const g of a.n1) {
+          const loc = g.stack && g.stack.file ? (g.stack.file.split(/[/\\]/).pop() + ':' + g.stack.line) : '';
+          const hint = /join/i.test(g.sql) ? 'many-to-many / reverse relation — use <code>prefetch_related()</code>' : 'related lookup — use <code>select_related()</code>';
+          html += '<div class="req-n1-row"' + (g.stack && g.stack.file ? ' data-file="' + escapeHtml(g.stack.file) + '" data-line="' + (g.stack.line || 1) + '"' : '') + '>' +
+            '<span class="req-n1-count">\u00D7' + g.count + '</span> ' +
+            '<code>' + escapeHtml((g.sql || '').replace(/\s+/g, ' ').slice(0, 140)) + '</code>' +
+            '<div class="req-n1-hint">\u2192 ' + hint + '</div>' +
+            (loc ? '<div class="sec-file">' + escapeHtml(loc) + '</div>' : '') +
+            '</div>';
+        }
+        html += '</div>';
+      }
       for (const qr of sorted) {
         const loc = qr.stack && qr.stack.file ? (qr.stack.file.split(/[/\\]/).pop() + ':' + qr.stack.line) : '';
         html += '<div class="req-query' + ((qr.time || 0) >= nautProfSlowThreshold ? ' slow' : '') + '"' +
@@ -4881,6 +4935,11 @@
     }
     box.innerHTML = html;
     box.querySelectorAll('.req-query').forEach((item) => {
+      item.addEventListener('click', () => {
+        if (item.dataset.file) nautGoto(item.dataset.file, parseInt(item.dataset.line, 10) || 1);
+      });
+    });
+    box.querySelectorAll('.req-n1-row').forEach((item) => {
       item.addEventListener('click', () => {
         if (item.dataset.file) nautGoto(item.dataset.file, parseInt(item.dataset.line, 10) || 1);
       });

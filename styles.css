@@ -3520,6 +3520,59 @@ body {
   padding: 6px 8px;
   background: rgba(0,0,0,0.15);
 }
+.req-row.n1 .req-line {
+  background: rgba(255, 196, 87, 0.06);
+  border-left: 2px solid #f0c674;
+}
+.req-n1 {
+  font-size: 9px;
+  font-weight: 700;
+  color: #f0c674;
+  background: rgba(240, 198, 116, 0.15);
+  border: 1px solid rgba(240, 198, 116, 0.35);
+  border-radius: 3px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.req-n1-block {
+  margin: 4px 0 8px;
+  border: 1px solid rgba(240, 198, 116, 0.3);
+  border-radius: 4px;
+  background: rgba(240, 198, 116, 0.06);
+  padding: 5px 6px;
+}
+.req-n1-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f0c674;
+  margin-bottom: 4px;
+}
+.req-n1-row {
+  padding: 3px 4px;
+  border-top: 1px solid rgba(240, 198, 116, 0.15);
+  cursor: pointer;
+  font-size: 10.5px;
+}
+.req-n1-row:hover {
+  background: rgba(240, 198, 116, 0.08);
+}
+.req-n1-count {
+  font-family: var(--mono, 'Cascadia Code', Consolas, monospace);
+  font-weight: 700;
+  color: #f0c674;
+}
+.req-n1-row code {
+  color: #dbe2e8;
+  word-break: break-all;
+}
+.req-n1-hint {
+  font-size: 10px;
+  color: #7ee787;
+  margin-top: 1px;
+}
+.req-n1-hint code {
+  color: #7ee787;
+}
 .req-no-sql {
   color: var(--text-dim, #9aa4af);
   font-size: 10.5px;
