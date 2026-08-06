@@ -3,7 +3,10 @@
   "version": "1.0.5",
   "description": "Полноценная IDE для Django с терминалом, AI-ассистентом и деплоем",
   "main": "main.js",
-  "author": "DjangoNAUT",
+  "author": {
+    "name": "DjangoNAUT",
+    "email": "mardon@users.noreply.github.com"
+  },
   "license": "MIT",
   "homepage": "https://github.com/Mardon-programm/Django_NAUT",
   "repository": {
