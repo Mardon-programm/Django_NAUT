@@ -3334,6 +3334,35 @@ body {
   color: var(--text-dim, #9aa4af);
   margin-bottom: 4px;
 }
+.req-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.req-curl {
+  background: none;
+  border: none;
+  color: var(--text-dim, #9aa4af);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+}
+.req-curl:hover {
+  color: var(--accent, #4da3ff);
+  background: rgba(77, 163, 255, 0.12);
+}
+.req-curl-ok {
+  font-size: 9px;
+  color: var(--green, #4ec9b0);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.req-redirect {
+  color: var(--yellow, #d29922);
+}
 .req-query {
   padding: 3px 4px;
   cursor: pointer;

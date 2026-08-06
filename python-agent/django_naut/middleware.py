@@ -64,6 +64,16 @@ def _capture_stack():
     return None
 
 
+_RESPONSE_HEADERS = (
+    "Content-Type",
+    "Content-Length",
+    "Location",
+    "Cache-Control",
+    "X-Frame-Options",
+    "Server",
+)
+
+
 def _flat_params(qdict):
     """QueryDict → plain dict, collapsing single-value lists to scalars."""
     out = {}
@@ -138,6 +148,26 @@ def _capture_request(request):
     return info
 
 
+def _capture_response(response):
+    """Snapshot a small subset of response headers for the inspector."""
+    info = {}
+    if response is None:
+        return info
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return info
+    for name in _RESPONSE_HEADERS:
+        try:
+            value = headers.get(name)
+        except Exception:
+            value = None
+        if value:
+            info[name] = value
+    if getattr(response, "is_redirect", False):
+        info["isRedirect"] = True
+    return info
+
+
 class DjangoNautMiddleware(MiddlewareMixin):
     def __init__(self, get_response):
         super().__init__(get_response)
@@ -169,10 +199,12 @@ class DjangoNautMiddleware(MiddlewareMixin):
             request_info = _capture_request(request)
         except Exception:
             request_info = None
+        response_info = {}
         try:
             with connection.execute_wrapper(wrapper):
                 response = self.get_response(request)
             status = getattr(response, "status_code", 200)
+            response_info = _capture_response(response)
         except Exception as exc:
             status = 500
             self._report_error(request, exc)
@@ -210,6 +242,7 @@ class DjangoNautMiddleware(MiddlewareMixin):
                     "requestTime": request_time,
                     "totalTime": round(sum(q["time"] for q in queries), 2),
                     "requestInfo": request_info,
+                    "responseInfo": response_info,
                 },
             )
         return response

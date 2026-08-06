@@ -4741,6 +4741,7 @@
       sqlMs: payload.totalTime || 0,
       queries: payload.queries || [],
       req: payload.requestInfo || null,
+      res: payload.responseInfo || null,
     });
     if (nautReqList.length > 200) nautReqList = nautReqList.slice(-200);
     if (nautReqTimer) return;
@@ -4817,7 +4818,11 @@
     let html = '';
     const ri = r.req;
     if (ri) {
-      html += '<div class="req-detail-title">Request</div>';
+      html += '<div class="req-detail-head"><span class="req-detail-title">Request</span>' +
+        '<button class="req-curl" title="Copy as cURL" data-curl-id="' + r.id + '">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+        '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
+        '</button></div>';
       if (ri.headers) html += nautReqKvBlock('Headers', ri.headers);
       if (ri.params) html += nautReqKvBlock('Params', ri.params);
       if (ri.json != null) {
@@ -4834,6 +4839,16 @@
         html += '<div class="req-body"><div class="req-body-label">Multipart upload</div>' +
           '<pre>' + escapeHtml(ri.contentType || '') + (ri.bodySize ? '\n' + ri.bodySize + ' bytes' : '') + '</pre></div>';
       }
+    }
+    if (r.res && Object.keys(r.res).length) {
+      const rr = r.res;
+      html += '<div class="req-detail-title">Response' +
+        (rr.isRedirect ? ' · <span class="req-redirect">redirect</span>' : '') + '</div>';
+      const redir = {};
+      for (const k of Object.keys(rr)) {
+        if (k !== 'isRedirect') redir[k] = rr[k];
+      }
+      if (Object.keys(redir).length) html += nautReqKvBlock('Headers', redir);
     }
     if (!r.queries.length) {
       html += '<div class="req-no-sql">' + (ri ? 'No SQL queries executed.' : 'No request data or SQL queries.') + '</div>';
@@ -4856,6 +4871,55 @@
         if (item.dataset.file) nautGoto(item.dataset.file, parseInt(item.dataset.line, 10) || 1);
       });
     });
+    box.querySelectorAll('.req-curl').forEach((btn) => {
+      btn.addEventListener('click', () => nautReqCopyCurl(parseInt(btn.dataset.curlId, 10), btn));
+    });
+  }
+
+  function nautReqCurl(id) {
+    const r = nautReqList.find((x) => x.id === id);
+    if (!r) return '';
+    const ri = r.req || {};
+    const host = (ri.headers && ri.headers['Host']) || 'localhost:8000';
+    let url = 'http://' + host + r.path;
+    if (ri.params && (r.method === 'GET' || r.method === 'HEAD')) {
+      const qs = Object.keys(ri.params).map((k) => {
+        const v = ri.params[k];
+        return encodeURIComponent(k) + '=' + encodeURIComponent(Array.isArray(v) ? v[0] : v);
+      }).join('&');
+      if (qs) url += (url.indexOf('?') >= 0 ? '&' : '?') + qs;
+    }
+    let curl = 'curl';
+    if (r.method !== 'GET') curl += ' -X ' + r.method;
+    curl += ' ' + url;
+    if (ri.headers) {
+      for (const k of Object.keys(ri.headers)) {
+        if (k === 'Host') continue;
+        curl += " -H '" + String(k + ': ' + ri.headers[k]).replace(/'/g, "'\\''") + "'";
+      }
+    }
+    if (ri.body) curl += " -d '" + String(ri.body).replace(/'/g, "'\\''") + "'";
+    return curl;
+  }
+
+  async function nautReqCopyCurl(id, btn) {
+    const curl = nautReqCurl(id);
+    if (!curl) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(curl);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = curl;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      const prev = btn.innerHTML;
+      btn.innerHTML = '<span class="req-curl-ok">copied</span>';
+      setTimeout(() => { if (btn.isConnected) btn.innerHTML = prev; }, 1200);
+    } catch (e) { console.warn('[naut] curl copy failed:', e.message); }
   }
 
   function nautReqKvBlock(title, obj) {
