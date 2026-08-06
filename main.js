@@ -18,6 +18,7 @@ const cacheInspector = require('./cache-inspector');
 const dbInspector = require('./db-inspector');
 const urlInspector = require('./url-inspector');
 const modelInspector = require('./model-inspector');
+const settingsInspector = require('./settings-inspector');
 const migrationGraph = require('./migration-graph');
 
 app.commandLine.appendSwitch('disable-gpu');
@@ -1153,6 +1154,12 @@ ipcMain.handle('orm:scan', async (_e, root) => {
   const shell = shellRPC.getShell(root);
   if (!shell) return { ok: false, error: 'No project root' };
   return shell.exec(modelInspector.scanCode());
+});
+
+ipcMain.handle('cfg:scan', async (_e, root) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(settingsInspector.settingsCode());
 });
 
 ipcMain.handle('test:scan', (_e, root) => {

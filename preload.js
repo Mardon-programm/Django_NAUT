@@ -159,6 +159,10 @@ contextBridge.exposeInMainWorld('api', {
     scan: (root) => ipcRenderer.invoke('orm:scan', root),
   },
 
+  cfg: {
+    scan: (root) => ipcRenderer.invoke('cfg:scan', root),
+  },
+
   tests: {
     scan: (root) => ipcRenderer.invoke('test:scan', root),
     run: (opts) => ipcRenderer.invoke('test:run', opts),

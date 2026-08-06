@@ -5075,6 +5075,7 @@
     nautRefreshDb();
     nautRefreshUrls();
     nautRefreshOrm();
+    nautRefreshCfg();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -5691,6 +5692,72 @@
     return html + '</div>';
   }
 
+  // ── Settings & Env Inspector ───────────────────────────────────────────
+
+  let _cfgSections = {};
+  let _cfgFilter = '';
+
+  async function nautRefreshCfg() {
+    if (!currentFolder) return;
+    const el = $('#cfg-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Reading settings…</p></div>';
+    let res;
+    try { res = await window.api.cfg.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(data.error.split('\n').pop()) + '</p></div>'; return; }
+    _cfgSections = data;
+    nautRenderCfg();
+  }
+
+  function nautCfgVal(v) {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') {
+      try { return JSON.stringify(v, null, 1); } catch { return String(v); }
+    }
+    return String(v);
+  }
+
+  function nautRenderCfg() {
+    const el = $('#cfg-body');
+    if (!el) return;
+    const q = _cfgFilter.toLowerCase();
+    const keys = Object.keys(_cfgSections).filter((k) => {
+      if (!q) return true;
+      const sec = _cfgSections[k];
+      return k.toLowerCase().includes(q) ||
+        (Array.isArray(sec) ? sec.join(' ').toLowerCase().includes(q) : JSON.stringify(sec).toLowerCase().includes(q));
+    });
+    const hidden = Object.keys(_cfgSections).length - keys.length;
+    let html = '<div class="mig-summary">' + Object.keys(_cfgSections).length + ' sections' + (hidden ? ' · ' + hidden + ' hidden' : '') + '</div>';
+    if (!keys.length) { el.innerHTML = html + '<div class="bug-empty"><p>No matching settings.</p></div>'; return; }
+    const order = ['versions', 'core', 'paths', 'email', 'auth', 'apps', 'middleware', 'databases', 'caches', 'env'];
+    keys.sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+    for (const sec of keys) {
+      const value = _cfgSections[sec];
+      html += '<div class="cfg-section"><div class="cfg-section-head">' + escapeHtml(sec) + ' <span class="cfg-count">' + (Array.isArray(value) ? value.length + ' items' : Object.keys(value).length + ' keys') + '</span></div><div class="cfg-section-body" style="display:none">';
+      if (Array.isArray(value)) {
+        for (const item of value) html += '<div class="cfg-row"><span class="cfg-key">' + escapeHtml(String(item)) + '</span></div>';
+      } else {
+        for (const k of Object.keys(value)) {
+          html += '<div class="cfg-row"><span class="cfg-key">' + escapeHtml(k) + '</span><span class="cfg-val">' + escapeHtml(nautCfgVal(value[k])) + '</span></div>';
+        }
+      }
+      html += '</div></div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.cfg-section-head').forEach((head) => {
+      head.addEventListener('click', () => {
+        const body = head.nextElementSibling;
+        if (body) body.style.display = body.style.display === 'none' ? '' : 'none';
+      });
+    });
+  }
+
   // ── Wire up ─────────────────────────────────────────────────────────────
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
@@ -5718,6 +5785,8 @@
   $('#btn-url-refresh')?.addEventListener('click', nautRefreshUrls);
   $('#orm-search')?.addEventListener('input', (e) => { _ormFilter = e.target.value; nautRenderOrm(); });
   $('#btn-orm-refresh')?.addEventListener('click', nautRefreshOrm);
+  $('#cfg-search')?.addEventListener('input', (e) => { _cfgFilter = e.target.value; nautRenderCfg(); });
+  $('#btn-cfg-refresh')?.addEventListener('click', nautRefreshCfg);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();
