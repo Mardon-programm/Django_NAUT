@@ -3814,6 +3814,7 @@
       { label: 'View: Toggle AI Assistant', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="ai"]').classList.add('active'); $('#panel-ai').classList.add('active'); if (aiInput) aiInput.focus(); }, category: 'View' },
       { label: 'View: Toggle Docker', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="docker"]').classList.add('active'); $('#panel-docker').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle API Client', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="apiclient"]').classList.add('active'); $('#panel-apiclient').classList.add('active'); }, category: 'View' },
+      { label: 'View: Toggle Forms', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="forms"]').classList.add('active'); $('#panel-forms').classList.add('active'); nautRefreshForms(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -5199,6 +5200,7 @@
     nautRefreshCfg();
     nautRefreshMail();
     nautRefreshTpl();
+    nautRefreshForms();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -6073,6 +6075,106 @@
     return html;
   }
 
+  // ── Forms Inspector ────────────────────────────────────────────────────
+  let _formsData = null;
+  let _formsFilter = '';
+
+  async function nautRefreshForms() {
+    if (!currentFolder) return;
+    const el = $('#forms-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Scanning forms…</p></div>';
+    let res;
+    try { res = await window.api.forms.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(data.error.split('\n').pop()) + '</p></div>'; return; }
+    _formsData = data;
+    nautRenderForms();
+  }
+
+  function nautRenderForms() {
+    const el = $('#forms-body');
+    if (!el) return;
+    const st = $('#forms-status');
+    const forms = (_formsData && _formsData.forms) || [];
+    if (!forms.length) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>' + ((_formsData && _formsData.errors && _formsData.errors.length) ? 'Forms modules failed to import.' : 'No forms found in this project.') + '</p></div>';
+      return;
+    }
+    const q = _formsFilter.toLowerCase();
+    let rows = forms;
+    if (q) {
+      rows = forms.filter((f) =>
+        f.name.toLowerCase().includes(q) ||
+        f.module.toLowerCase().includes(q) ||
+        (f.model || '').toLowerCase().includes(q) ||
+        f.fields.some((fd) => fd.name.toLowerCase().includes(q) || fd.type.toLowerCase().includes(q) || fd.widget.toLowerCase().includes(q))
+      );
+    }
+    if (st) {
+      const summary = (_formsData.count || forms.length) + ' forms · ' + (_formsData.fieldCount || 0) + ' fields' + ((_formsData.errors || []).length ? ' · ' + _formsData.errors.length + ' import errors' : '');
+      st.textContent = summary;
+    }
+    let html = '<div class="mig-summary">' + (_formsData.count || forms.length) + ' forms · ' + (_formsData.fieldCount || 0) + ' fields' + (q ? ' · ' + rows.length + ' matched' : '') + '</div>';
+    if (_formsData.errors && _formsData.errors.length) {
+      for (const e of _formsData.errors) {
+        html += '<div class="tpl-shadowed">⚠ ' + escapeHtml(e.module) + ': ' + escapeHtml(String(e.error).slice(0, 140)) + '</div>';
+      }
+    }
+    const byMod = {};
+    for (const f of rows) (byMod[f.module] = byMod[f.module] || []).push(f);
+    for (const mod of Object.keys(byMod).sort()) {
+      html += '<div class="mig-section-title">' + escapeHtml(mod) + '</div>';
+      for (const f of byMod[mod]) {
+        const flags = (f.isModelForm ? ' <span class="orm-flag">ModelForm</span>' : '') +
+          (f.base && f.base.length ? ' <span class="orm-flag">ext: ' + escapeHtml(f.base.join(',')) + '</span>' : '') +
+          (f.model ? ' <span class="orm-flag">model: ' + escapeHtml(f.model) + '</span>' : '');
+        html += '<div class="orm-model">' +
+          '<div class="orm-model-head" data-file="' + escapeHtml(f.file || '') + '">' +
+          '<span class="orm-model-name">' + escapeHtml(f.name) + '</span>' + flags +
+          (f.fields.length ? '<span class="orm-model-count">' + f.fields.length + '</span>' : '') +
+          '</div>' +
+          '<div class="orm-model-detail" style="display:none">' +
+          (f.modelFields ? '<div class="orm-meta">fields: <b>' + escapeHtml(f.modelFields.join(', ')) + '</b></div>' : '') +
+          (f.modelExclude ? '<div class="orm-meta">exclude: ' + escapeHtml(f.modelExclude.join(', ')) + '</div>' : '') +
+          (f.modelWidgets && f.modelWidgets.length ? '<div class="orm-meta">widgets: ' + escapeHtml(f.modelWidgets.join(', ')) + '</div>' : '') +
+          (f.modelLabels && f.modelLabels.length ? '<div class="orm-meta">labels: ' + escapeHtml(f.modelLabels.join(', ')) + '</div>' : '') +
+          '<div class="orm-subtitle">Fields (' + f.fields.length + ')</div>' +
+          nautFormsFieldList(f.fields) +
+          '</div></div>';
+      }
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.orm-model-head').forEach((head) => {
+      head.addEventListener('click', () => {
+        const detail = head.nextElementSibling;
+        if (detail) detail.style.display = detail.style.display === 'none' ? '' : 'none';
+      });
+      head.addEventListener('dblclick', () => { if (head.dataset.file) nautGoto(head.dataset.file, 1); });
+    });
+  }
+
+  function nautFormsFieldList(fields) {
+    let html = '<div class="orm-fields">';
+    for (const f of fields) {
+      const tags = [];
+      if (f.required) tags.push('required');
+      if (f.declared) tags.push('declared');
+      html += '<div class="orm-field"><span class="orm-field-name">' + escapeHtml(f.name) + '</span>' +
+        '<span class="orm-field-type">' + escapeHtml(f.type) + '</span>' +
+        (f.widget ? '<span class="orm-field-widget">[' + escapeHtml(f.widget) + ']</span>' : '') +
+        (f.querysetModel ? '<span class="orm-field-rel">→ ' + escapeHtml(f.querysetModel) + '</span>' : '') +
+        (f.choices ? '<span class="orm-field-choices">choices: ' + f.choices + '</span>' : '') +
+        (f.maxLength ? '<span class="orm-field-lim">max ' + f.maxLength + '</span>' : '') +
+        (f.label && f.label !== f.name ? '<span class="orm-field-label">' + escapeHtml(String(f.label).slice(0, 60)) + '</span>' : '') +
+        (f.helpText ? '<span class="orm-field-help">' + escapeHtml(String(f.helpText).slice(0, 60)) + '</span>' : '') +
+        '<span class="orm-field-tags">' + tags.map((t) => '<span class="orm-tag">' + t + '</span>').join('') + '</span></div>';
+    }
+    return html + '</div>';
+  }
+
   // ── Wire up ─────────────────────────────────────────────────────────────
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
@@ -6114,6 +6216,8 @@
   });
   $('#tpl-search')?.addEventListener('input', (e) => { _tplFilter = e.target.value; nautRenderTpl(); });
   $('#btn-tpl-refresh')?.addEventListener('click', nautRefreshTpl);
+  $('#forms-search')?.addEventListener('input', (e) => { _formsFilter = e.target.value; nautRenderForms(); });
+  $('#btn-forms-refresh')?.addEventListener('click', nautRefreshForms);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

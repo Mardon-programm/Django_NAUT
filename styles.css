@@ -2868,6 +2868,27 @@ body {
   color: var(--text-dim, #9aa4af);
   font-size: 10px;
 }
+.orm-field-widget {
+  color: var(--green, #7bc96f);
+  font-size: 10px;
+}
+.orm-field-choices {
+  color: var(--purple, #b392f0);
+  font-size: 10px;
+}
+.orm-field-label {
+  color: var(--text-dim, #9aa4af);
+  font-size: 10px;
+  font-style: italic;
+}
+.orm-field-help {
+  color: rgba(154, 164, 175, 0.7);
+  font-size: 10px;
+}
+.orm-field-lim {
+  color: var(--orange, #f5a623);
+  font-size: 10px;
+}
 .orm-field-tags {
   display: inline-flex;
   gap: 3px;
