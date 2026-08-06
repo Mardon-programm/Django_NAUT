@@ -5074,6 +5074,7 @@
     nautRefreshCache();
     nautRefreshDb();
     nautRefreshUrls();
+    nautRefreshOrm();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -5599,6 +5600,97 @@
     });
   }
 
+  // ── ORM Inspector ──────────────────────────────────────────────────────
+
+  let _ormModels = [];
+  let _ormFilter = '';
+
+  async function nautRefreshOrm() {
+    if (!currentFolder) return;
+    const el = $('#orm-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Introspecting models…</p></div>';
+    let res;
+    try { res = await window.api.orm.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const arr = Array.isArray(res) ? res : [];
+    const err = arr.find((r) => r && r.error);
+    if (err) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(err.error.split('\n').pop()) + '</p></div>'; return; }
+    _ormModels = arr;
+    nautRenderOrm();
+  }
+
+  function nautRenderOrm() {
+    const el = $('#orm-body');
+    if (!el) return;
+    const q = _ormFilter.toLowerCase();
+    let list = _ormModels;
+    if (q) {
+      list = _ormModels.filter((m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.app.toLowerCase().includes(q) ||
+        m.table.toLowerCase().includes(q) ||
+        m.fields.some((f) => f.name.toLowerCase().includes(q))
+      );
+    }
+    let totalRows = 0;
+    for (const m of _ormModels) { if (typeof m.count === 'number') totalRows += m.count; }
+    let html = '<div class="mig-summary">' + _ormModels.length + ' models · ' + totalRows + ' rows' + (q ? ' · ' + list.length + ' matched' : '') + '</div>';
+    if (!list.length) { el.innerHTML = html + '<div class="bug-empty"><p>No matching models.</p></div>'; return; }
+    const byApp = {};
+    for (const m of list) (byApp[m.app] = byApp[m.app] || []).push(m);
+    for (const app of Object.keys(byApp).sort()) {
+      html += '<div class="mig-section-title">' + escapeHtml(app) + '</div>';
+      for (const m of byApp[app]) {
+        const flags = (m.abstract ? ' <span class="orm-flag">abstract</span>' : '') + (m.proxy ? ' <span class="orm-flag">proxy</span>' : '');
+        html += '<div class="orm-model">' +
+          '<div class="orm-model-head" data-file="' + escapeHtml(m.file || '') + '">' +
+          '<span class="orm-model-name">' + escapeHtml(m.name) + flags + '</span>' +
+          (typeof m.count === 'number' ? '<span class="orm-model-count">' + m.count + '</span>' : '') +
+          '</div>' +
+          '<div class="orm-model-detail" style="display:none">' +
+          '<div class="orm-meta">table: <b>' + escapeHtml(m.table) + '</b></div>' +
+          '<div class="orm-subtitle">Fields (' + m.fields.length + ')</div>' +
+          nautOrmFieldList(m.fields) +
+          (m.m2m.length ? '<div class="orm-subtitle">M2M</div>' + nautOrmRelList(m.m2m.map((x) => x.name + ' → ' + x.to)) : '') +
+          (m.reverse.length ? '<div class="orm-subtitle">Reverse relations</div>' + nautOrmRelList(m.reverse.map((x) => x.from + ' → ' + x.name)) : '') +
+          '</div></div>';
+      }
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.orm-model-head').forEach((head) => {
+      head.addEventListener('click', () => {
+        const detail = head.nextElementSibling;
+        if (detail) detail.style.display = detail.style.display === 'none' ? '' : 'none';
+      });
+      head.addEventListener('dblclick', () => { if (head.dataset.file) nautGoto(head.dataset.file, 1); });
+    });
+  }
+
+  function nautOrmFieldList(fields) {
+    let html = '<div class="orm-fields">';
+    for (const f of fields) {
+      const tags = [];
+      if (f.pk) tags.push('PK');
+      if (f.unique) tags.push('unique');
+      if (f.indexed) tags.push('index');
+      if (f.null) tags.push('null');
+      if (f.blank) tags.push('blank');
+      html += '<div class="orm-field"><span class="orm-field-name">' + escapeHtml(f.name) + '</span>' +
+        '<span class="orm-field-type">' + escapeHtml(f.type) + '</span>' +
+        (f.related ? '<span class="orm-field-rel">→ ' + escapeHtml(f.related) + (f.onDelete ? ' [' + escapeHtml(f.onDelete) + ']' : '') + '</span>' : '') +
+        (f.default !== null && f.default !== undefined && f.default !== '' ? '<span class="orm-field-default">= ' + escapeHtml(String(f.default).slice(0, 40)) + '</span>' : '') +
+        '<span class="orm-field-tags">' + tags.map((t) => '<span class="orm-tag">' + t + '</span>').join('') + '</span></div>';
+    }
+    return html + '</div>';
+  }
+
+  function nautOrmRelList(items) {
+    let html = '<div class="orm-fields">';
+    for (const it of items) html += '<div class="orm-field"><span class="orm-field-rel">' + escapeHtml(it) + '</span></div>';
+    return html + '</div>';
+  }
+
   // ── Wire up ─────────────────────────────────────────────────────────────
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
@@ -5624,6 +5716,8 @@
   $('#btn-db-refresh')?.addEventListener('click', nautRefreshDb);
   $('#url-search')?.addEventListener('input', (e) => { _urlFilter = e.target.value; nautRenderUrls(); });
   $('#btn-url-refresh')?.addEventListener('click', nautRefreshUrls);
+  $('#orm-search')?.addEventListener('input', (e) => { _ormFilter = e.target.value; nautRenderOrm(); });
+  $('#btn-orm-refresh')?.addEventListener('click', nautRefreshOrm);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();
