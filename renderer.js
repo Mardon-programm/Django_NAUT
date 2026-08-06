@@ -3818,6 +3818,7 @@
       { label: 'View: Toggle Static Files', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="static"]').classList.add('active'); $('#panel-static').classList.add('active'); nautRefreshStatic(); }, category: 'View' },
       { label: 'View: Toggle ASGI / Routing', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="asgi"]').classList.add('active'); $('#panel-asgi').classList.add('active'); nautRefreshAsgi(); }, category: 'View' },
       { label: 'View: Toggle Manage Commands', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="commands"]').classList.add('active'); $('#panel-commands').classList.add('active'); nautRefreshCommands(); }, category: 'View' },
+      { label: 'View: Toggle Middleware', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="mw"]').classList.add('active'); $('#panel-mw').classList.add('active'); nautRefreshMw(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -5315,6 +5316,7 @@
     nautRefreshStatic();
     nautRefreshAsgi();
     nautRefreshCommands();
+    nautRefreshMw();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -6588,6 +6590,79 @@
     });
   }
 
+  // ── Middleware Inspector ───────────────────────────────────────────────
+  let _mwData = null;
+  let _mwFilter = '';
+
+  async function nautRefreshMw() {
+    if (!currentFolder) return;
+    const el = $('#mw-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Resolving middleware pipeline…</p></div>';
+    let res;
+    try { res = await window.api.middleware.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(String(data.error).split('\n').pop()) + '</p></div>'; return; }
+    _mwData = data;
+    nautRenderMw();
+  }
+
+  function nautRenderMw() {
+    const el = $('#mw-body');
+    if (!el) return;
+    const st = $('#mw-status');
+    const data = _mwData;
+    if (!data || !Array.isArray(data.middleware)) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>No middleware data.</p></div>';
+      return;
+    }
+    const q = _mwFilter.toLowerCase();
+    const match = (s) => !q || (s || '').toLowerCase().includes(q);
+    const all = data.middleware.filter((m) => match(m.path) || match(m.class) || match(m.module) || (m.note || '').includes(q));
+    if (st) {
+      const parts = [data.total + ' middleware', data.projectCount + ' project', data.builtinCount + ' builtin'];
+      if (data.asyncCount) parts.push(data.asyncCount + ' async');
+      if (data.errors && data.errors.length) parts.push(data.errors.length + ' errors');
+      st.textContent = parts.join(' · ');
+    }
+    const hlabel = { process_request: 'request', process_view: 'view', process_response: 'response', process_exception: 'exception', process_template_response: 'template' };
+    let html = '';
+    if (data.errors && data.errors.length) {
+      for (const e of data.errors.slice(0, 5)) {
+        html += '<div class="tpl-shadowed">⚠ ' + escapeHtml(e.path + ': ' + (e.error || 'failed to load')) + '</div>';
+      }
+    }
+    if (all.length) {
+      const names = all.map((m) => m.class || m.path.split('.').pop());
+      html += '<div class="mw-pipeline"><div class="mw-flowline"><span class="mw-flowlabel">request</span>' +
+        names.map((n, i) => '<span class="mw-flowstep" data-i="' + i + '">' + (i + 1) + '·' + escapeHtml(n) + '</span>').join('→') + '</div>' +
+        '<div class="mw-flowline"><span class="mw-flowlabel">response</span>' +
+        names.slice().reverse().map((n, i) => '<span class="mw-flowstep">' + (names.length - i) + '·' + escapeHtml(n) + '</span>').join('←') + '</div></div>';
+      for (const m of all) {
+        html += '<div class="cmd-row"' + (m.file ? ' data-open="' + escapeHtml(m.file) + '"' : '') + '>' +
+          '<div class="cmd-line"><span class="cmd-name">' + escapeHtml(m.class || m.path) + '</span>' +
+          '<span class="cmd-chip mw-idx">' + m.index + '</span>' +
+          (m.builtin ? '<span class="cmd-app">builtin</span>' : '<span class="cmd-app mw-proj">project</span>') +
+          (m.kind === 'function' ? '<span class="cmd-chip mw-fn">fn</span>' : '') +
+          (m.async ? '<span class="cmd-chip mw-async">async</span>' : '') +
+          (m.note ? '<span class="cmd-chip">' + escapeHtml(m.note) + '</span>' : '') +
+          '</div>' +
+          (m.hooks && m.hooks.length ? '<div class="cmd-line mw-hooks">' + m.hooks.map((h) => '<span class="mw-hook' + (m.asyncHooks && m.asyncHooks.indexOf(h) !== -1 ? ' mw-hook-async' : '') + '">' + escapeHtml(hlabel[h] || h) + '</span>').join('') + '</div>' : '<div class="cmd-help">no hooks — passthrough</div>') +
+          '<div class="sec-file">' + escapeHtml((m.module || '') + '.' + (m.class || '?')) + '</div>' +
+          '</div>';
+      }
+    } else if (!data.errors) {
+      html += '<div class="bug-empty"><p>No middleware configured.</p></div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-open]').forEach((row) => {
+      if (!row.dataset.open) return;
+      row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
+    });
+  }
+
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
@@ -6636,6 +6711,8 @@
   $('#btn-asgi-refresh')?.addEventListener('click', nautRefreshAsgi);
   $('#commands-search')?.addEventListener('input', (e) => { _cmdsFilter = e.target.value; nautRenderCommands(); });
   $('#btn-commands-refresh')?.addEventListener('click', nautRefreshCommands);
+  $('#mw-search')?.addEventListener('input', (e) => { _mwFilter = e.target.value; nautRenderMw(); });
+  $('#btn-mw-refresh')?.addEventListener('click', nautRefreshMw);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

@@ -3155,6 +3155,68 @@ body {
   color: var(--accent, #4da3ff);
 }
 
+/* Middleware Inspector */
+.mw-pipeline {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.08);
+  background: rgba(77, 163, 255, 0.04);
+}
+.mw-flowline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.mw-flowlabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim, #9aa4af);
+  min-width: 52px;
+}
+.mw-flowstep {
+  font-family: var(--mono, 'Cascadia Code', Consolas, monospace);
+  color: var(--text, #dbe2e8);
+  background: rgba(77, 163, 255, 0.12);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.mw-idx {
+  color: var(--text-dim, #9aa4af);
+  background: rgba(128, 128, 128, 0.15);
+}
+.mw-proj {
+  color: #7ee787;
+  background: rgba(126, 231, 135, 0.1);
+}
+.mw-async {
+  color: #d2a8ff;
+  background: rgba(210, 168, 255, 0.1);
+}
+.mw-fn {
+  color: #7ee787;
+  background: rgba(126, 231, 135, 0.1);
+}
+.mw-hooks {
+  margin-top: 3px;
+  gap: 4px;
+}
+.mw-hook {
+  font-size: 9px;
+  color: #79c0ff;
+  background: rgba(121, 192, 255, 0.1);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.mw-hook-async {
+  color: #d2a8ff;
+  background: rgba(210, 168, 255, 0.1);
+}
+
 /* Settings & Env Inspector */
 .cfg-section {
   border-bottom: 1px solid rgba(128,128,128,0.08);

@@ -183,6 +183,10 @@ contextBridge.exposeInMainWorld('api', {
     scan: (root) => ipcRenderer.invoke('commands:scan', root),
   },
 
+  middleware: {
+    scan: (root) => ipcRenderer.invoke('middleware:scan', root),
+  },
+
   mail: {
     list: (root) => ipcRenderer.invoke('mail:list', root),
     read: (id, root) => ipcRenderer.invoke('mail:read', { root, id }),

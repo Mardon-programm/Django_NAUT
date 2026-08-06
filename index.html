@@ -198,6 +198,11 @@
             <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="mw" title="Middleware">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2 2 7l10 5 10-5z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>
+          </svg>
+        </button>
       </div>
       <div class="activity-bar-bottom">
         <button class="activity-icon" id="btn-settings" title="Settings (Ctrl+,)">
@@ -1066,6 +1071,33 @@
               <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
             </svg>
             <p>Open a Django project to list its manage.py commands.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middleware Panel -->
+      <div class="sidebar-panel" id="panel-mw">
+        <div class="sidebar-header">
+          <span>MIDDLEWARE</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-mw-refresh" title="Rescan middleware">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="log-toolbar">
+          <input id="mw-search" type="text" placeholder="Filter middleware…" spellcheck="false">
+          <span class="mail-status" id="mw-status"></span>
+        </div>
+        <div class="sidebar-body" id="mw-body">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M12 2 2 7l10 5 10-5z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>
+            </svg>
+            <p>Open a Django project to inspect its middleware pipeline.</p>
           </div>
         </div>
       </div>
