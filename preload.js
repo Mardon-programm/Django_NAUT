@@ -171,6 +171,10 @@ contextBridge.exposeInMainWorld('api', {
     scan: (root) => ipcRenderer.invoke('forms:scan', root),
   },
 
+  static: {
+    scan: (root) => ipcRenderer.invoke('static:scan', root),
+  },
+
   mail: {
     list: (root) => ipcRenderer.invoke('mail:list', root),
     read: (id, root) => ipcRenderer.invoke('mail:read', { root, id }),

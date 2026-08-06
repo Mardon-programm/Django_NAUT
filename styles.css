@@ -2903,6 +2903,113 @@ body {
   color: var(--text-dim, #9aa4af);
 }
 
+/* Static Files Inspector */
+.static-shadowed {
+  font-size: 10px;
+  color: var(--orange, #ce9178);
+  padding: 2px 0;
+}
+.static-broken {
+  border: 1px solid rgba(206, 145, 120, 0.3);
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin: 3px 0;
+  cursor: pointer;
+  background: rgba(206, 145, 120, 0.06);
+}
+.static-broken:hover {
+  background: rgba(206, 145, 120, 0.12);
+}
+.static-broken-tpl {
+  font-size: 10.5px;
+  color: var(--text, #d6dde3);
+  font-family: var(--font-mono, monospace);
+}
+.static-broken-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.static-ref-bad {
+  font-size: 9px;
+  color: var(--red, #f14c4c);
+  background: rgba(241, 76, 76, 0.12);
+  border: 1px solid rgba(241, 76, 76, 0.25);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: var(--font-mono, monospace);
+}
+.static-exts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 0 6px;
+}
+.static-ext {
+  font-size: 9px;
+  color: var(--accent, #4da3ff);
+  background: rgba(77, 163, 255, 0.1);
+  border: 1px solid rgba(77, 163, 255, 0.2);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--font-mono, monospace);
+}
+.static-extgroup {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.08);
+}
+.static-exthead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  cursor: pointer;
+  font-size: 10.5px;
+}
+.static-exthead:hover {
+  color: var(--text, #d6dde3);
+}
+.static-extname {
+  font-family: var(--font-mono, monospace);
+  color: var(--green, #4ec9b0);
+  font-weight: 600;
+}
+.static-extcount {
+  font-size: 9px;
+  color: var(--text-dim, #9aa4af);
+  background: rgba(128, 128, 128, 0.18);
+  border-radius: 8px;
+  padding: 0 6px;
+}
+.static-filelist {
+  display: flex;
+  flex-direction: column;
+}
+.static-file {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10px;
+  padding: 1px 0 1px 10px;
+  cursor: pointer;
+  color: var(--text, #d6dde3);
+}
+.static-file:hover {
+  color: var(--accent, #4da3ff);
+}
+.static-file-rel {
+  font-family: var(--font-mono, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.static-file-size {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--text-dim, #9aa4af);
+}
+
 /* Settings & Env Inspector */
 .cfg-section {
   border-bottom: 1px solid rgba(128,128,128,0.08);

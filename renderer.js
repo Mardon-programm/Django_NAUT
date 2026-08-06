@@ -3815,6 +3815,7 @@
       { label: 'View: Toggle Docker', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="docker"]').classList.add('active'); $('#panel-docker').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle API Client', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="apiclient"]').classList.add('active'); $('#panel-apiclient').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle Forms', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="forms"]').classList.add('active'); $('#panel-forms').classList.add('active'); nautRefreshForms(); }, category: 'View' },
+      { label: 'View: Toggle Static Files', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="static"]').classList.add('active'); $('#panel-static').classList.add('active'); nautRefreshStatic(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -5201,6 +5202,7 @@
     nautRefreshMail();
     nautRefreshTpl();
     nautRefreshForms();
+    nautRefreshStatic();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -6175,7 +6177,122 @@
     return html + '</div>';
   }
 
-  // ── Wire up ─────────────────────────────────────────────────────────────
+  // ── Static Files Inspector ─────────────────────────────────────────────
+  let _staticData = null;
+  let _staticFilter = '';
+  let _staticOpen = {};
+
+  function nautHumanSize(b) {
+    if (typeof b !== 'number' || b < 0) return '';
+    if (b < 1024) return b + ' B';
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  async function nautRefreshStatic() {
+    if (!currentFolder) return;
+    const el = $('#static-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Scanning static files…</p></div>';
+    let res;
+    try { res = await window.api.static.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(data.error.split('\n').pop()) + '</p></div>'; return; }
+    _staticData = data;
+    _staticOpen = {};
+    nautRenderStatic();
+  }
+
+  function nautRenderStatic() {
+    const el = $('#static-body');
+    if (!el) return;
+    const st = $('#static-status');
+    const data = _staticData;
+    if (!data || !Array.isArray(data.files)) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>No static data.</p></div>';
+      return;
+    }
+    const q = _staticFilter.toLowerCase();
+    const files = data.files;
+    const matchingFiles = q ? files.filter((f) => f.rel.toLowerCase().includes(q)) : files;
+    const broken = data.brokenRefs || [];
+    const matchingBroken = q ? broken.filter((b) => b.template.toLowerCase().includes(q) || b.refs.some((r) => r.toLowerCase().includes(q))) : broken;
+    const shadowed = data.shadowed || [];
+    if (st) {
+      const parts = [data.count + ' files', nautHumanSize(data.bytes)];
+      if (broken.length) parts.push(broken.length + ' broken');
+      if (shadowed.length) parts.push(shadowed.length + ' shadowed');
+      st.textContent = parts.join(' · ');
+    }
+    let html = '<div class="mig-summary">' + data.count + ' files · ' + nautHumanSize(data.bytes) +
+      (data.dirs ? ' · ' + data.dirs.length + ' dirs' : '') +
+      (broken.length ? ' · ' + broken.length + ' broken refs' : '') +
+      (shadowed.length ? ' · ' + shadowed.length + ' shadowed' : '') +
+      (q ? ' · ' + matchingFiles.length + ' matched' : '') + '</div>';
+
+    if (data.errors && data.errors.length) {
+      for (const e of data.errors) html += '<div class="tpl-shadowed">⚠ ' + escapeHtml(String(e).slice(0, 140)) + '</div>';
+    }
+
+    if (shadowed.length) {
+      html += '<div class="orm-subtitle">Shadowed names (' + shadowed.length + ')</div>';
+      for (const s of shadowed) {
+        html += '<div class="static-shadowed">⚠ <b>' + escapeHtml(s.rel) + '</b> in ' + escapeHtml(s.dirs.join(', ')) + '</div>';
+      }
+    }
+
+    if (matchingBroken.length) {
+      html += '<div class="orm-subtitle">Broken {% static %} refs (' + matchingBroken.length + ')</div>';
+      for (const b of matchingBroken) {
+        html += '<div class="static-broken" data-open="' + escapeHtml(b.path) + '">' +
+          '<div class="static-broken-tpl">' + escapeHtml(b.template) + '</div>' +
+          '<div class="static-broken-refs">' + b.refs.map((r) => '<span class="static-ref-bad">' + escapeHtml(r) + '</span>').join(' ') + '</div></div>';
+      }
+    }
+
+    const byExt = data.byExt || {};
+    html += '<div class="orm-subtitle">Files by type</div>';
+    html += '<div class="static-exts">' + Object.keys(byExt).map((e) => '<span class="static-ext">' + escapeHtml(e) + ' · ' + byExt[e] + '</span>').join('') + '</div>';
+
+    const groups = {};
+    for (const f of matchingFiles) {
+      const ext = f.rel.includes('.') ? f.rel.split('.').pop().toLowerCase() : '(none)';
+      (groups[ext] = groups[ext] || []).push(f);
+    }
+    const extKeys = Object.keys(groups).sort((a, b) => b.length - a.length || a.localeCompare(b));
+    for (const ext of extKeys) {
+      const list = groups[ext];
+      const open = _staticOpen[ext];
+      html += '<div class="static-extgroup' + (open ? ' open' : '') + '" data-ext="' + escapeHtml(ext) + '">' +
+        '<div class="static-exthead">' +
+        '<span class="static-extname">.' + escapeHtml(ext) + '</span>' +
+        '<span class="static-extcount">' + list.length + '</span>' +
+        '</div>' +
+        (open ? '<div class="static-filelist">' + list.map((f) =>
+          '<div class="static-file" data-open="' + escapeHtml(f.path) + '">' +
+          '<span class="static-file-rel">' + escapeHtml(f.rel) + '</span>' +
+          '<span class="static-file-size">' + nautHumanSize(f.size) + '</span>' +
+          '</div>').join('') + '</div>' : '') +
+        '</div>';
+    }
+    if (!extKeys.length) {
+      html += '<div class="bug-empty"><p>' + (q ? 'No matching files.' : 'No static files found.') + '</p></div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.static-exthead').forEach((head) => {
+      head.addEventListener('click', () => {
+        const grp = head.parentElement;
+        const ext = grp.dataset.ext;
+        _staticOpen[ext] = !_staticOpen[ext];
+        nautRenderStatic();
+      });
+    });
+    el.querySelectorAll('.static-file[data-open], .static-broken[data-open]').forEach((row) => {
+      row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
+    });
+  }
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
@@ -6218,6 +6335,8 @@
   $('#btn-tpl-refresh')?.addEventListener('click', nautRefreshTpl);
   $('#forms-search')?.addEventListener('input', (e) => { _formsFilter = e.target.value; nautRenderForms(); });
   $('#btn-forms-refresh')?.addEventListener('click', nautRefreshForms);
+  $('#static-search')?.addEventListener('input', (e) => { _staticFilter = e.target.value; nautRenderStatic(); });
+  $('#btn-static-refresh')?.addEventListener('click', nautRefreshStatic);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

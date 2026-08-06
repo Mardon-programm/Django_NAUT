@@ -22,6 +22,7 @@ const modelInspector = require('./model-inspector');
 const settingsInspector = require('./settings-inspector');
 const templateInspector = require('./template-inspector');
 const formsInspector = require('./forms-inspector');
+const staticInspector = require('./static-inspector');
 const migrationGraph = require('./migration-graph');
 
 const FULL_LIMITS = { jsonLimits: { list: 10000, dict: 1000, depth: 8 } };
@@ -1222,6 +1223,12 @@ ipcMain.handle('forms:scan', async (_e, root) => {
   const shell = shellRPC.getShell(root);
   if (!shell) return { ok: false, error: 'No project root' };
   return shell.exec(formsInspector.scanCode(), FULL_LIMITS);
+});
+
+ipcMain.handle('static:scan', async (_e, root) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(staticInspector.scanCode(), FULL_LIMITS);
 });
 
 ipcMain.handle('test:scan', (_e, root) => {
