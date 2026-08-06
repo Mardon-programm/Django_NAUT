@@ -3258,6 +3258,20 @@ body {
   white-space: nowrap;
 }
 
+/* Admin Inspector */
+.adm-admin {
+  font-size: 10.5px;
+  color: #79c0ff;
+  font-family: var(--mono, 'Cascadia Code', Consolas, monospace);
+}
+.adm-fields {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Settings & Env Inspector */
 .cfg-section {
   border-bottom: 1px solid rgba(128,128,128,0.08);

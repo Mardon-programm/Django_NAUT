@@ -3820,6 +3820,7 @@
       { label: 'View: Toggle Manage Commands', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="commands"]').classList.add('active'); $('#panel-commands').classList.add('active'); nautRefreshCommands(); }, category: 'View' },
       { label: 'View: Toggle Middleware', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="mw"]').classList.add('active'); $('#panel-mw').classList.add('active'); nautRefreshMw(); }, category: 'View' },
       { label: 'View: Toggle Translations / i18n', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="i18n"]').classList.add('active'); $('#panel-i18n').classList.add('active'); nautRefreshI18n(); }, category: 'View' },
+      { label: 'View: Toggle Admin Site', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="admin"]').classList.add('active'); $('#panel-admin').classList.add('active'); nautRefreshAdmin(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -5319,6 +5320,7 @@
     nautRefreshCommands();
     nautRefreshMw();
     nautRefreshI18n();
+    nautRefreshAdmin();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -6752,6 +6754,87 @@
     });
   }
 
+  // ── Admin Inspector ────────────────────────────────────────────────────
+  let _admData = null;
+  let _admFilter = '';
+
+  async function nautRefreshAdmin() {
+    if (!currentFolder) return;
+    const el = $('#admin-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Scanning admin registrations…</p></div>';
+    let res;
+    try { res = await window.api.admin.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(String(data.error).split('\n').pop()) + '</p></div>'; return; }
+    _admData = data;
+    nautRenderAdmin();
+  }
+
+  function nautRenderAdmin() {
+    const el = $('#admin-body');
+    if (!el) return;
+    const st = $('#admin-status');
+    const data = _admData;
+    if (!data || !Array.isArray(data.registrations)) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><p>No admin data.</p></div>';
+      return;
+    }
+    const q = _admFilter.toLowerCase();
+    const match = (s) => !q || (s || '').toLowerCase().includes(q);
+    if (st) {
+      const parts = [data.total + ' registered', data.projectCount + ' project'];
+      if (data.builtinCount) parts.push(data.builtinCount + ' builtin');
+      if (data.unregisteredCount) parts.push(data.unregisteredCount + ' unused admins');
+      st.textContent = parts.join(' · ');
+    }
+    let html = '';
+    const regs = data.registrations.filter((r) => match(r.model) || match(r.admin) || match(r.app));
+    if (regs.length) {
+      html += '<div class="orm-subtitle">Registered (' + regs.length + ')</div>';
+      for (const r of regs) {
+        html += '<div class="cmd-row"' + (r.adminFile ? ' data-open="' + escapeHtml(r.adminFile) + '"' : '') + '>' +
+          '<div class="cmd-line"><span class="cmd-name">' + escapeHtml(r.model) + '</span>' +
+          (r.builtin ? '<span class="cmd-app">builtin</span>' : '<span class="cmd-app mw-proj">project</span>') +
+          '</div>' +
+          '<div class="cmd-line">' +
+          '<span class="adm-admin">' + escapeHtml(r.admin) + '</span>' +
+          (r.listDisplay && r.listDisplay.length ? '<span class="cmd-chip mw-idx">list: ' + r.listDisplay.length + '</span>' : '') +
+          (r.searchFields && r.searchFields.length ? '<span class="cmd-chip mw-idx">search: ' + r.searchFields.length + '</span>' : '') +
+          (r.listFilter && r.listFilter.length ? '<span class="cmd-chip mw-idx">filter: ' + r.listFilter.length + '</span>' : '') +
+          (r.inlines && r.inlines.length ? '<span class="cmd-chip i18n-fuzzy">inline: ' + r.inlines.length + '</span>' : '') +
+          (r.listEditable && r.listEditable.length ? '<span class="cmd-chip mw-idx">editable: ' + r.listEditable.length + '</span>' : '') +
+          '</div>' +
+          (r.inlines && r.inlines.length ? '<div class="cmd-help">' + r.inlines.map((i) => escapeHtml(i.name + (i.model ? ' (' + i.model + ')' : ''))).join(' · ') + '</div>' : '') +
+          (r.searchFields && r.searchFields.length ? '<div class="cmd-help adm-fields">search: ' + escapeHtml(r.searchFields.join(', ')) + '</div>' : '') +
+          (r.listDisplay && r.listDisplay.length ? '<div class="cmd-help adm-fields">list: ' + escapeHtml(r.listDisplay.join(', ')) + '</div>' : '') +
+          '<div class="sec-file">' + escapeHtml(r.adminModule + ' → ' + (r.modelFile ? r.modelFile.split(/[/\\]/).slice(-2).join('/') : '')) + '</div>' +
+          '</div>';
+      }
+    } else if (!data.registrations.length) {
+      html += '<div class="orm-subtitle">Registered</div><div class="bug-empty"><p>No admin registrations found.</p></div>';
+    }
+    if (data.unregistered && data.unregistered.length) {
+      const un = data.unregistered.filter((u) => match(u.name) || match(u.app));
+      if (un.length) {
+        html += '<div class="orm-subtitle">Defined but not registered (' + un.length + ')</div>';
+        for (const u of un) {
+          html += '<div class="cmd-row"' + (u.file ? ' data-open="' + escapeHtml(u.file) + '"' : '') + '>' +
+            '<div class="cmd-line"><span class="cmd-name">' + escapeHtml(u.name) + '</span>' +
+            (u.model ? '<span class="cmd-app mw-proj">' + escapeHtml(u.model) + '</span>' : '') +
+            '</div><div class="sec-file">' + escapeHtml(u.app + '/admin.py') + '</div></div>';
+        }
+      }
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-open]').forEach((row) => {
+      if (!row.dataset.open) return;
+      row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
+    });
+  }
+
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
@@ -6804,6 +6887,8 @@
   $('#btn-mw-refresh')?.addEventListener('click', nautRefreshMw);
   $('#i18n-search')?.addEventListener('input', (e) => { _i18nFilter = e.target.value; nautRenderI18n(); });
   $('#btn-i18n-refresh')?.addEventListener('click', nautRefreshI18n);
+  $('#admin-search')?.addEventListener('input', (e) => { _admFilter = e.target.value; nautRenderAdmin(); });
+  $('#btn-admin-refresh')?.addEventListener('click', nautRefreshAdmin);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();
