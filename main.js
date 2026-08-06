@@ -16,6 +16,7 @@ const shellRPC = require('./shell-rpc');
 const deps = require('./deps-updater');
 const cacheInspector = require('./cache-inspector');
 const dbInspector = require('./db-inspector');
+const urlInspector = require('./url-inspector');
 const migrationGraph = require('./migration-graph');
 
 app.commandLine.appendSwitch('disable-gpu');
@@ -1139,6 +1140,12 @@ ipcMain.handle('db:query', async (_e, { root, alias, sql, params, limit }) => {
   if (!shell) return { ok: false, error: 'No project root' };
   if (!dbInspector.isReadOnly(sql)) return { ok: false, error: 'Only read-only queries are allowed (SELECT/EXPLAIN/WITH/SHOW/PRAGMA).' };
   return shell.exec(dbInspector.queryCode(alias, sql, params, limit));
+});
+
+ipcMain.handle('urls:scan', async (_e, root) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(urlInspector.scanCode());
 });
 
 ipcMain.handle('test:scan', (_e, root) => {

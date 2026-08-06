@@ -2540,6 +2540,60 @@ body {
   flex-shrink: 0;
 }
 
+/* URL Inspector */
+.url-item {
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+  cursor: pointer;
+}
+.url-item:hover {
+  background: rgba(77, 163, 255, 0.08);
+}
+.url-route {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text, #d6dde3);
+  word-break: break-all;
+}
+.url-name {
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+}
+.url-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.url-method {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+.url-method-get { background: #2d6a4f; }
+.url-method-post { background: #b45309; }
+.url-method-put { background: #065f46; }
+.url-method-patch { background: #92400e; }
+.url-method-delete { background: #9f1239; }
+.url-method-head { background: #374151; }
+.url-method-options { background: #374151; }
+.url-method-trace { background: #374151; }
+.url-method-any { background: #4da3ff; }
+.url-view {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Celery tasks */
 .db-engine-label {
   font-size: 10px;

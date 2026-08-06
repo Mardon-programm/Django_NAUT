@@ -151,6 +151,10 @@ contextBridge.exposeInMainWorld('api', {
     query: (opts) => ipcRenderer.invoke('db:query', opts),
   },
 
+  urls: {
+    scan: (root) => ipcRenderer.invoke('urls:scan', root),
+  },
+
   tests: {
     scan: (root) => ipcRenderer.invoke('test:scan', root),
     run: (opts) => ipcRenderer.invoke('test:run', opts),

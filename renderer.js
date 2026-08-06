@@ -5073,6 +5073,7 @@
     nautResetProfiler();
     nautRefreshCache();
     nautRefreshDb();
+    nautRefreshUrls();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -5535,8 +5536,70 @@
     resEl.innerHTML = nautDbRowsTable(data.columns, data.rows, 'db-query-table');
   }
 
-  // ── Wire up ─────────────────────────────────────────────────────────────
+  // ── URL Inspector ──────────────────────────────────────────────────────
 
+  let _urlRoutes = [];
+  let _urlFilter = '';
+
+  async function nautRefreshUrls() {
+    if (!currentFolder) return;
+    const el = $('#url-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Resolving urlpatterns…</p></div>';
+    let res;
+    try { res = await window.api.urls.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const arr = Array.isArray(res) ? res : [];
+    const err = arr.find((r) => r && r.error);
+    if (err) {
+      el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(err.error.split('\n').pop()) + '</p></div>';
+      return;
+    }
+    _urlRoutes = arr;
+    nautRenderUrls();
+  }
+
+  function nautRenderUrls() {
+    const el = $('#url-body');
+    if (!el) return;
+    const q = _urlFilter.toLowerCase();
+    const list = q ? _urlRoutes.filter((r) => (r.route || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q) || (r.view || '').toLowerCase().includes(q)) : _urlRoutes;
+    const methodCount = {};
+    for (const r of _urlRoutes) {
+      for (const m of (r.methods || [])) methodCount[m] = (methodCount[m] || 0) + 1;
+      if (!r.methods || !r.methods.length) methodCount['ANY'] = (methodCount['ANY'] || 0) + 1;
+    }
+    const badge = Object.keys(methodCount).slice(0, 6).map((m) => '<span class="url-method url-method-' + m.toLowerCase() + '">' + m + ' ' + methodCount[m] + '</span>').join('');
+    let html = '<div class="mig-summary">' + _urlRoutes.length + ' routes' + (q ? ' · ' + list.length + ' matched' : '') + (badge ? ' · ' + badge : '') + '</div>';
+    if (!list.length) {
+      html += '<div class="bug-empty"><p>No matching routes.</p></div>';
+      el.innerHTML = html;
+      return;
+    }
+    const byNs = {};
+    for (const r of list) {
+      const key = r.namespace || '(root)';
+      (byNs[key] = byNs[key] || []).push(r);
+    }
+    for (const ns of Object.keys(byNs).sort()) {
+      html += '<div class="mig-section-title">' + escapeHtml(ns) + '</div>';
+      for (const r of byNs[ns]) {
+        const methods = (r.methods && r.methods.length) ? r.methods.map((m) => '<span class="url-method url-method-' + m.toLowerCase() + '">' + m + '</span>').join('') : '<span class="url-method url-method-any">ANY</span>';
+        html += '<div class="url-item" data-file="' + escapeHtml(r.file || '') + '" data-view="' + escapeHtml(r.view || '') + '">' +
+          '<div class="url-route">' + escapeHtml(r.route) + (r.name ? '<span class="url-name">' + escapeHtml(r.name) + '</span>' : '') + '</div>' +
+          '<div class="url-meta">' + methods + ' <span class="url-view">' + escapeHtml(r.view || '?') + (r.classBased ? ' (CBV)' : '') + '</span></div>' +
+          '</div>';
+      }
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.url-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        if (item.dataset.file) nautGoto(item.dataset.file, 1);
+      });
+    });
+  }
+
+  // ── Wire up ─────────────────────────────────────────────────────────────
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
@@ -5559,6 +5622,8 @@
   $('#btn-cache-clear')?.addEventListener('click', nautClearCache);
   $('#cache-alias')?.addEventListener('change', nautRenderCache);
   $('#btn-db-refresh')?.addEventListener('click', nautRefreshDb);
+  $('#url-search')?.addEventListener('input', (e) => { _urlFilter = e.target.value; nautRenderUrls(); });
+  $('#btn-url-refresh')?.addEventListener('click', nautRefreshUrls);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();
