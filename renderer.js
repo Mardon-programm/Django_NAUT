@@ -3821,6 +3821,7 @@
       { label: 'View: Toggle Middleware', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="mw"]').classList.add('active'); $('#panel-mw').classList.add('active'); nautRefreshMw(); }, category: 'View' },
       { label: 'View: Toggle Translations / i18n', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="i18n"]').classList.add('active'); $('#panel-i18n').classList.add('active'); nautRefreshI18n(); }, category: 'View' },
       { label: 'View: Toggle Admin Site', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="admin"]').classList.add('active'); $('#panel-admin').classList.add('active'); nautRefreshAdmin(); }, category: 'View' },
+      { label: 'View: Toggle REST Framework', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="drf"]').classList.add('active'); $('#panel-drf').classList.add('active'); nautRefreshDrf(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -5321,6 +5322,7 @@
     nautRefreshMw();
     nautRefreshI18n();
     nautRefreshAdmin();
+    nautRefreshDrf();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -6835,6 +6837,99 @@
     });
   }
 
+  // ── DRF Inspector ──────────────────────────────────────────────────────
+  let _drfData = null;
+  let _drfFilter = '';
+
+  async function nautRefreshDrf() {
+    if (!currentFolder) return;
+    const el = $('#drf-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Scanning REST framework…</p></div>';
+    let res;
+    try { res = await window.api.drf.scan(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const data = (res && res.result) || {};
+    if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(String(data.error).split('\n').pop()) + '</p></div>'; return; }
+    _drfData = data;
+    nautRenderDrf();
+  }
+
+  function nautRenderDrf() {
+    const el = $('#drf-body');
+    if (!el) return;
+    const st = $('#drf-status');
+    const data = _drfData;
+    if (!data) { if (st) st.textContent = ''; el.innerHTML = '<div class="bug-empty"><p>No data.</p></div>'; return; }
+    if (data.hasDrf === false) {
+      if (st) st.textContent = '';
+      el.innerHTML = '<div class="bug-empty"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6"><path d="M8 6l-6 6 6 6"/><path d="M16 6l6 6-6 6"/><line x1="13" y1="3" x2="11" y2="21"/></svg><p>Django REST Framework is not installed.<br>Add it with <code>pip install djangorestframework</code> and add <code>rest_framework</code> to <code>INSTALLED_APPS</code>.</p></div>';
+      return;
+    }
+    const q = _drfFilter.toLowerCase();
+    const match = (s) => !q || (s || '').toLowerCase().includes(q);
+    if (st) {
+      const parts = [data.viewsetCount + ' viewsets', data.serializerCount + ' serializers'];
+      if (data.routeCount) parts.push(data.routeCount + ' routes');
+      if (data.errors && data.errors.length) parts.push(data.errors.length + ' errors');
+      st.textContent = parts.join(' · ');
+    }
+    let html = '';
+    if (data.errors && data.errors.length) {
+      for (const e of data.errors.slice(0, 4)) html += '<div class="tpl-shadowed">⚠ ' + escapeHtml(e) + '</div>';
+    }
+    if (data.routers && data.routers.length) {
+      html += '<div class="orm-subtitle">Routers (' + data.routers.length + ')</div>';
+      for (const rt of data.routers) {
+        html += '<div class="mw-pipeline"><div class="cmd-line"><span class="cmd-name">' + escapeHtml(rt.var) + '</span><span class="cmd-app mw-proj">' + escapeHtml(rt.type) + '</span></div>';
+        for (const r of rt.routes) {
+          html += '<div class="cmd-line"><span class="drf-prefix">/' + escapeHtml(r.prefix) + '</span> <span class="cmd-chip mw-idx">→</span> <span class="adm-admin">' + escapeHtml(r.viewset) + '</span>' + (r.basename ? '<span class="cmd-chip mw-idx">' + escapeHtml(r.basename) + '</span>' : '') + '</div>';
+        }
+        html += '</div>';
+      }
+    }
+    const vs = data.viewsets.filter((v) => match(v.name) || match(v.model) || match(v.serializer) || match(v.module));
+    if (vs.length) {
+      html += '<div class="orm-subtitle">Viewsets (' + vs.length + ')</div>';
+      for (const v of vs) {
+        html += '<div class="cmd-row"' + (v.file ? ' data-open="' + escapeHtml(v.file) + '"' : '') + '>' +
+          '<div class="cmd-line"><span class="cmd-name">' + escapeHtml(v.name) + '</span>' +
+          (v.model ? '<span class="cmd-app mw-proj">' + escapeHtml(v.model) + '</span>' : '') +
+          (v.actions && v.actions.length ? '<span class="cmd-chip">override: ' + escapeHtml(v.actions.join('+')) + '</span>' : '') +
+          '</div>' +
+          (v.serializer ? '<div class="cmd-line"><span class="drf-label">serializer</span><span class="adm-admin">' + escapeHtml(v.serializer) + '</span></div>' : '') +
+          '<div class="cmd-line">' +
+          (v.permissions && v.permissions.length ? v.permissions.map((p) => '<span class="cmd-chip mw-idx">' + escapeHtml(p) + '</span>').join('') : '') +
+          (v.pagination ? '<span class="cmd-chip i18n-fuzzy">pag: ' + escapeHtml(v.pagination) + '</span>' : '') +
+          '</div>' +
+          '<div class="sec-file">' + escapeHtml(v.module) + '</div></div>';
+      }
+    }
+    const ss = data.serializers.filter((s) => match(s.name) || match(s.model) || match(s.module));
+    if (ss.length) {
+      html += '<div class="orm-subtitle">Serializers (' + ss.length + ')</div>';
+      for (const s of ss) {
+        html += '<div class="cmd-row"' + (s.file ? ' data-open="' + escapeHtml(s.file) + '"' : '') + '>' +
+          '<div class="cmd-line"><span class="cmd-name">' + escapeHtml(s.name) + '</span>' +
+          (s.model ? '<span class="cmd-app mw-proj">' + escapeHtml(s.model) + '</span>' : '') +
+          '<span class="cmd-chip mw-idx">' + s.declared + ' fields</span>' +
+          (s.depth !== null && s.depth !== undefined ? '<span class="cmd-chip mw-idx">depth ' + s.depth + '</span>' : '') +
+          (s.readOnly ? '<span class="cmd-chip i18n-fuzzy">' + s.readOnly + ' read-only</span>' : '') +
+          '</div>' +
+          (s.nested && s.nested.length ? '<div class="cmd-help">nested: ' + escapeHtml(s.nested.join(', ')) + '</div>' : '') +
+          '<div class="sec-file">' + escapeHtml(s.module) + '</div></div>';
+      }
+    }
+    if (!vs.length && !ss.length && (!data.routers || !data.routers.length)) {
+      html += '<div class="bug-empty"><p>No REST framework API components found.</p></div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-open]').forEach((row) => {
+      if (!row.dataset.open) return;
+      row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
+    });
+  }
+
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
@@ -6889,6 +6984,8 @@
   $('#btn-i18n-refresh')?.addEventListener('click', nautRefreshI18n);
   $('#admin-search')?.addEventListener('input', (e) => { _admFilter = e.target.value; nautRenderAdmin(); });
   $('#btn-admin-refresh')?.addEventListener('click', nautRefreshAdmin);
+  $('#drf-search')?.addEventListener('input', (e) => { _drfFilter = e.target.value; nautRenderDrf(); });
+  $('#btn-drf-refresh')?.addEventListener('click', nautRefreshDrf);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

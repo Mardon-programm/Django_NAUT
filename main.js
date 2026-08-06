@@ -28,6 +28,7 @@ const commandsInspector = require('./commands-inspector');
 const middlewareInspector = require('./middleware-inspector');
 const i18nInspector = require('./i18n-inspector');
 const adminInspector = require('./admin-inspector');
+const drfInspector = require('./drf-inspector');
 const migrationGraph = require('./migration-graph');
 
 const FULL_LIMITS = { jsonLimits: { list: 10000, dict: 1000, depth: 8 } };
@@ -1264,6 +1265,12 @@ ipcMain.handle('admin:scan', async (_e, root) => {
   const shell = shellRPC.getShell(root);
   if (!shell) return { ok: false, error: 'No project root' };
   return shell.exec(adminInspector.scanCode(), FULL_LIMITS);
+});
+
+ipcMain.handle('drf:scan', async (_e, root) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(drfInspector.scanCode(), FULL_LIMITS);
 });
 
 ipcMain.handle('test:scan', (_e, root) => {

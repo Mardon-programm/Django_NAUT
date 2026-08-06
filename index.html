@@ -216,6 +216,11 @@
             <path d="M9 12l2 2 4-4"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="drf" title="REST Framework">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 6l-6 6 6 6"/><path d="M16 6l6 6-6 6"/><line x1="13" y1="3" x2="11" y2="21"/>
+          </svg>
+        </button>
       </div>
       <div class="activity-bar-bottom">
         <button class="activity-icon" id="btn-settings" title="Settings (Ctrl+,)">
@@ -1168,6 +1173,33 @@
               <path d="M9 12l2 2 4-4"/>
             </svg>
             <p>Open a Django project to inspect its admin site.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- DRF Panel -->
+      <div class="sidebar-panel" id="panel-drf">
+        <div class="sidebar-header">
+          <span>REST FRAMEWORK</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-drf-refresh" title="Rescan REST framework">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="log-toolbar">
+          <input id="drf-search" type="text" placeholder="Filter viewset or serializer…" spellcheck="false">
+          <span class="mail-status" id="drf-status"></span>
+        </div>
+        <div class="sidebar-body" id="drf-body">
+          <div class="bug-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6">
+              <path d="M8 6l-6 6 6 6"/><path d="M16 6l6 6-6 6"/><line x1="13" y1="3" x2="11" y2="21"/>
+            </svg>
+            <p>Open a Django project to inspect its REST Framework API.</p>
           </div>
         </div>
       </div>

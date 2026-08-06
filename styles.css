@@ -3272,6 +3272,20 @@ body {
   white-space: nowrap;
 }
 
+/* DRF Inspector */
+.drf-prefix {
+  font-family: var(--mono, 'Cascadia Code', Consolas, monospace);
+  font-size: 11px;
+  color: #7ee787;
+}
+.drf-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim, #9aa4af);
+  margin-right: 6px;
+}
+
 /* Settings & Env Inspector */
 .cfg-section {
   border-bottom: 1px solid rgba(128,128,128,0.08);
