@@ -5072,6 +5072,7 @@
     nautRefreshTests();
     nautResetProfiler();
     nautRefreshCache();
+    nautRefreshDb();
     try {
       const info = await window.api.agent.check(currentFolder);
       const hint = $('#agent-status');
@@ -5375,6 +5376,165 @@
     }
   }
 
+  // ── Database Inspector ────────────────────────────────────────────────
+
+  let _dbAliases = [];
+  let _dbCurrentAlias = 'default';
+
+  function nautDbBody() {
+    return $('#db-tables');
+  }
+
+  async function nautRefreshDb() {
+    if (!currentFolder) return;
+    const sel = $('#db-alias');
+    const body = nautDbBody();
+    if (!sel || !body) return;
+    let res;
+    try { res = await window.api.db.databases(currentFolder); } catch (e) { body.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { body.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed to connect') + '</p></div>'; return; }
+    _dbAliases = Array.isArray(res) ? res : [];
+    sel.innerHTML = '';
+    for (const d of _dbAliases) {
+      const opt = document.createElement('option');
+      opt.value = d.alias;
+      opt.textContent = d.alias + (d.name ? ' (' + d.name + ')' : '');
+      sel.appendChild(opt);
+    }
+    if (!_dbAliases.some((d) => d.alias === _dbCurrentAlias)) _dbCurrentAlias = _dbAliases.length ? _dbAliases[0].alias : '';
+    if (_dbCurrentAlias) sel.value = _dbCurrentAlias;
+    nautDbUpdateEngine();
+    await nautLoadDbTables();
+  }
+
+  function nautDbUpdateEngine() {
+    const el = $('#db-engine');
+    if (!el) return;
+    const d = _dbAliases.find((x) => x.alias === _dbCurrentAlias);
+    el.textContent = d ? (d.engine || '') : '';
+  }
+
+  async function nautLoadDbTables() {
+    if (!currentFolder) return;
+    const body = nautDbBody();
+    if (!body) return;
+    body.innerHTML = '<div class="bug-empty"><p>Loading tables…</p></div>';
+    let res;
+    try { res = await window.api.db.tables({ root: currentFolder, alias: _dbCurrentAlias }); } catch (e) { body.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (res && res.ok === false) { body.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(res.error || 'Failed') + '</p></div>'; return; }
+    const tables = Array.isArray(res) ? res : [];
+    if (!tables.length) { body.innerHTML = '<div class="bug-empty"><p>No tables found.</p></div>'; return; }
+    let html = '<div class="db-summary">' + tables.length + ' tables</div>';
+    for (const t of tables) {
+      html += '<div class="db-table-item" data-table="' + escapeHtml(t.name) + '">' +
+        '<div class="db-table-name">' + escapeHtml(t.name) + '</div>' +
+        (t.rows != null ? '<div class="db-table-rows">' + t.rows + ' rows</div>' : '') +
+        '</div>';
+    }
+    body.innerHTML = html;
+    body.querySelectorAll('.db-table-item').forEach((item) => {
+      item.addEventListener('click', () => nautOpenDbTable(item.dataset.table, item));
+    });
+  }
+
+  async function nautOpenDbTable(table, item) {
+    if (!currentFolder) return;
+    const active = $('#db-tables .db-table-item.active');
+    if (active) active.classList.remove('active');
+    if (item) item.classList.add('active');
+    const resEl = $('#db-results');
+    if (!resEl) return;
+    resEl.innerHTML = '<div class="db-query-status">Loading ' + escapeHtml(table) + '…</div>';
+    let desc, prev;
+    try {
+      [desc, prev] = await Promise.all([
+        window.api.db.describe({ root: currentFolder, alias: _dbCurrentAlias, table }),
+        window.api.db.preview({ root: currentFolder, alias: _dbCurrentAlias, table }),
+      ]);
+    } catch (e) { resEl.innerHTML = '<div class="db-query-status">' + escapeHtml(e.message) + '</div>'; return; }
+    if ((desc && desc.ok === false) || (prev && prev.ok === false)) {
+      resEl.innerHTML = '<div class="db-query-status">' + escapeHtml((desc && desc.error) || (prev && prev.error) || 'Failed') + '</div>';
+      return;
+    }
+    const cols = Array.isArray(desc) ? desc : [];
+    const prevData = (prev && prev.result) || {};
+    const prevCols = prevData.columns || [];
+    const rows = prevData.rows || [];
+    let html = '<div class="db-summary">' + escapeHtml(table) + ' · ' + cols.length + ' columns · ' + rows.length + ' rows shown</div>';
+    if (cols.length) {
+      html += '<div class="db-cols">';
+      for (const c of cols) {
+        html += '<div class="db-col"><span class="db-col-name">' + escapeHtml(c.name) + '</span>' +
+          '<span class="db-col-type">' + escapeHtml(c.type) + (c.pk ? ' · PK' : '') + '</span>' +
+          '<span class="db-col-flag">' + (c.null ? 'NULL' : 'NOT NULL') + '</span></div>';
+      }
+      html += '</div>';
+    }
+    html += nautDbRowsTable(prevCols, rows, 'db-preview');
+    resEl.innerHTML = html;
+  }
+
+  function nautDbRowsTable(cols, rows, cls) {
+    if (!cols || !cols.length) return '<div class="db-query-status">No rows.</div>';
+    let html = '<div class="db-table-wrap ' + cls + '"><table class="db-table">';
+    html += '<thead><tr>';
+    for (const c of cols) html += '<th>' + escapeHtml(c) + '</th>';
+    html += '</tr></thead><tbody>';
+    if (!rows.length) {
+      html += '<tr><td colspan="' + cols.length + '" class="db-empty-cell">No rows returned.</td></tr>';
+    } else {
+      for (const r of rows) {
+        html += '<tr>';
+        for (let i = 0; i < cols.length; i++) {
+          const v = r[i];
+          html += '<td class="' + (v === null ? 'db-null' : '') + '">' + (v === null ? 'NULL' : escapeHtml(String(v))) + '</td>';
+        }
+        html += '</tr>';
+      }
+    }
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  async function nautRunDbQuery() {
+    if (!currentFolder) return;
+    const input = $('#db-query-input');
+    const resEl = $('#db-results');
+    const status = $('#db-query-status');
+    if (!input || !resEl || !status) return;
+    const sql = input.value.trim();
+    if (!sql) { showToast('Enter a SQL query', 'warn'); return; }
+    const limit = parseInt($('#db-limit')?.value || '100', 10) || 100;
+    status.textContent = 'Running…';
+    resEl.innerHTML = '';
+    let res;
+    try {
+      res = await window.api.db.query({ root: currentFolder, alias: _dbCurrentAlias, sql, params: [], limit });
+    } catch (e) {
+      status.textContent = 'Error';
+      resEl.innerHTML = '<div class="db-query-status">' + escapeHtml(e.message) + '</div>';
+      return;
+    }
+    if (res && res.ok === false) {
+      status.textContent = 'Blocked';
+      resEl.innerHTML = '<div class="db-query-status">' + escapeHtml(res.error || 'Query rejected') + '</div>';
+      return;
+    }
+    const data = (res && res.result) || {};
+    if (data.error) {
+      status.textContent = 'Error';
+      resEl.innerHTML = '<div class="db-query-status db-query-error">' + escapeHtml(data.error) + '</div>';
+      return;
+    }
+    const timeMs = (res && res.queries && res.queries.length) ? res.queries[res.queries.length - 1].time : null;
+    status.textContent = (timeMs != null ? Math.round(timeMs) + ' ms' : '') + ' · ' + (data.rowcount != null ? data.rowcount + ' rows affected' : (data.rows || []).length + ' rows');
+    if (!data.columns || !data.columns.length) {
+      resEl.innerHTML = '<div class="db-query-status">Statement executed.' + (data.rowcount != null ? ' ' + data.rowcount + ' rows affected.' : '') + '</div>';
+      return;
+    }
+    resEl.innerHTML = nautDbRowsTable(data.columns, data.rows, 'db-query-table');
+  }
+
   // ── Wire up ─────────────────────────────────────────────────────────────
 
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
@@ -5398,6 +5558,18 @@
   $('#btn-cache-scan')?.addEventListener('click', nautRefreshCache);
   $('#btn-cache-clear')?.addEventListener('click', nautClearCache);
   $('#cache-alias')?.addEventListener('change', nautRenderCache);
+  $('#btn-db-refresh')?.addEventListener('click', nautRefreshDb);
+  $('#db-alias')?.addEventListener('change', () => {
+    _dbCurrentAlias = $('#db-alias')?.value || 'default';
+    nautDbUpdateEngine();
+    nautLoadDbTables();
+    $('#db-results') && ($('#db-results').innerHTML = '');
+    $('#db-query-status') && ($('#db-query-status').textContent = '');
+  });
+  $('#btn-db-run')?.addEventListener('click', nautRunDbQuery);
+  $('#db-query-input')?.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); nautRunDbQuery(); }
+  });
   $('#btn-mock-data')?.addEventListener('click', nautMockData);
   $('#btn-naut-runserver')?.addEventListener('click', nautRunServer);
   $('#btn-naut-install')?.addEventListener('click', nautInstallAgent);

@@ -15,6 +15,7 @@ const testRunner = require('./test-runner');
 const shellRPC = require('./shell-rpc');
 const deps = require('./deps-updater');
 const cacheInspector = require('./cache-inspector');
+const dbInspector = require('./db-inspector');
 const migrationGraph = require('./migration-graph');
 
 app.commandLine.appendSwitch('disable-gpu');
@@ -1107,6 +1108,37 @@ ipcMain.handle('cache:clear', async (_e, { root, alias }) => {
   const shell = shellRPC.getShell(root);
   if (!shell) return { ok: false, error: 'No project root' };
   return shell.exec(cacheInspector.clearCode(alias));
+});
+
+ipcMain.handle('db:databases', async (_e, root) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(dbInspector.databasesCode());
+});
+
+ipcMain.handle('db:tables', async (_e, { root, alias }) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(dbInspector.tablesCode(alias));
+});
+
+ipcMain.handle('db:describe', async (_e, { root, alias, table }) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(dbInspector.describeCode(alias, table));
+});
+
+ipcMain.handle('db:preview', async (_e, { root, alias, table }) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  return shell.exec(dbInspector.previewCode(alias, table, 50));
+});
+
+ipcMain.handle('db:query', async (_e, { root, alias, sql, params, limit }) => {
+  const shell = shellRPC.getShell(root);
+  if (!shell) return { ok: false, error: 'No project root' };
+  if (!dbInspector.isReadOnly(sql)) return { ok: false, error: 'Only read-only queries are allowed (SELECT/EXPLAIN/WITH/SHOW/PRAGMA).' };
+  return shell.exec(dbInspector.queryCode(alias, sql, params, limit));
 });
 
 ipcMain.handle('test:scan', (_e, root) => {

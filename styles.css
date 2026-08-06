@@ -2541,6 +2541,198 @@ body {
 }
 
 /* Celery tasks */
+.db-engine-label {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-query {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.db-query textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  background: var(--bg-code, rgba(0,0,0,0.35));
+  color: var(--text, #d6dde3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  padding: 6px 8px;
+  line-height: 1.5;
+}
+.db-query textarea:focus {
+  outline: none;
+  border-color: var(--accent, #4da3ff);
+}
+.db-query-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.db-limit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+}
+.db-limit input {
+  width: 56px;
+  background: var(--bg-code, rgba(0,0,0,0.35));
+  color: var(--text, #d6dde3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 10px;
+  padding: 2px 4px;
+}
+#btn-db-run {
+  background: var(--accent, #4da3ff);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+#btn-db-run:hover {
+  filter: brightness(1.1);
+}
+.db-query-status {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-query-error {
+  color: var(--red, #f14c4c);
+}
+.db-results {
+  border-bottom: 1px solid var(--border);
+  max-height: 260px;
+  overflow: auto;
+}
+.db-section-title {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim, #9aa4af);
+  border-bottom: 1px solid var(--border);
+}
+.db-summary {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--text-dim, #9aa4af);
+}
+.db-table-item {
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+  cursor: pointer;
+}
+.db-table-item:hover {
+  background: rgba(77, 163, 255, 0.08);
+}
+.db-table-item.active {
+  background: rgba(77, 163, 255, 0.14);
+  border-left: 3px solid var(--accent, #4da3ff);
+}
+.db-table-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text, #d6dde3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.db-table-rows {
+  font-size: 10px;
+  color: var(--text-dim, #9aa4af);
+  flex-shrink: 0;
+}
+.db-cols {
+  padding: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.db-col {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 10.5px;
+}
+.db-col-name {
+  font-family: var(--font-mono, monospace);
+  color: var(--accent, #4da3ff);
+  min-width: 120px;
+}
+.db-col-type {
+  color: var(--text, #d6dde3);
+}
+.db-col-flag {
+  color: var(--text-dim, #9aa4af);
+}
+.db-table-wrap {
+  margin: 6px 10px;
+  overflow: auto;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.db-table {
+  border-collapse: collapse;
+  font-size: 10.5px;
+  width: max-content;
+  min-width: 100%;
+}
+.db-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel, #1e2227);
+  color: var(--text-dim, #9aa4af);
+  text-align: left;
+  padding: 4px 8px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+}
+.db-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid rgba(128,128,128,0.08);
+  white-space: nowrap;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono, monospace);
+}
+.db-table td.db-null {
+  color: var(--red, #f14c4c);
+  font-style: italic;
+}
+.db-empty-cell {
+  color: var(--text-dim, #9aa4af);
+  text-align: center;
+  padding: 12px;
+}
+
+/* Celery tasks */
 .task-item {
   padding: 8px 10px;
   border-bottom: 1px solid rgba(128,128,128,0.08);

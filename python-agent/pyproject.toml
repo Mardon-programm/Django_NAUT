@@ -10,4 +10,4 @@ requires-python = ">=3.9"
 dependencies = ["Django>=3.2"]
 
 [tool.setuptools]
-packages = ["django_naut"]
+packages = ["django_naut", "django_naut.management", "django_naut.management.commands"]

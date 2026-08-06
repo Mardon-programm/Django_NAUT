@@ -143,6 +143,14 @@ contextBridge.exposeInMainWorld('api', {
     clear: (opts) => ipcRenderer.invoke('cache:clear', opts),
   },
 
+  db: {
+    databases: (root) => ipcRenderer.invoke('db:databases', root),
+    tables: (opts) => ipcRenderer.invoke('db:tables', opts),
+    describe: (opts) => ipcRenderer.invoke('db:describe', opts),
+    preview: (opts) => ipcRenderer.invoke('db:preview', opts),
+    query: (opts) => ipcRenderer.invoke('db:query', opts),
+  },
+
   tests: {
     scan: (root) => ipcRenderer.invoke('test:scan', root),
     run: (opts) => ipcRenderer.invoke('test:run', opts),
