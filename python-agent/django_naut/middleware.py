@@ -9,6 +9,7 @@ MIDDLEWARE in settings.py.
 """
 
 import inspect
+import json
 import time
 import traceback
 
@@ -16,6 +17,23 @@ from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
 
 from django_naut.telemetry import get_client
+
+_REQUEST_HEADERS = (
+    ("HTTP_HOST", "Host"),
+    ("HTTP_USER_AGENT", "User-Agent"),
+    ("HTTP_ACCEPT", "Accept"),
+    ("HTTP_ACCEPT_LANGUAGE", "Accept-Language"),
+    ("HTTP_ACCEPT_ENCODING", "Accept-Encoding"),
+    ("HTTP_REFERER", "Referer"),
+    ("HTTP_ORIGIN", "Origin"),
+    ("CONTENT_TYPE", "Content-Type"),
+    ("HTTP_X_REQUESTED_WITH", "X-Requested-With"),
+    ("HTTP_COOKIE", "Cookie"),
+    ("HTTP_AUTHORIZATION", "Authorization"),
+)
+
+_BODY_CAPTURE_LIMIT = 64 * 1024  # bodies up to this size get JSON parsing
+_BODY_SEND_LIMIT = 16 * 1024     # only this slice is sent to the IDE
 
 
 def _get_port():
@@ -46,6 +64,80 @@ def _capture_stack():
     return None
 
 
+def _flat_params(qdict):
+    """QueryDict → plain dict, collapsing single-value lists to scalars."""
+    out = {}
+    try:
+        for key, values in qdict.lists():
+            out[key] = values[0] if len(values) == 1 else values
+    except Exception:
+        try:
+            out = dict(qdict)
+        except Exception:
+            pass
+    return out
+
+
+def _capture_request(request):
+    """Snapshot request headers / params / body without breaking the view.
+
+    Non-multipart bodies are read once (Django caches them, so the view still
+    sees the full body). Multipart uploads are skipped — reading them would
+    consume the file stream — and only their content type/size is noted.
+    """
+    info = {}
+    method = (getattr(request, "method", "") or "").upper()
+    ctype = request.META.get("CONTENT_TYPE", "") or ""
+
+    headers = {}
+    for meta_key, name in _REQUEST_HEADERS:
+        value = request.META.get(meta_key)
+        if value:
+            headers[name] = value
+    if headers:
+        info["headers"] = headers
+
+    if method in ("GET", "HEAD"):
+        params = _flat_params(getattr(request, "GET", None))
+        if params:
+            info["params"] = params
+        return info
+
+    if method in ("POST", "PUT", "PATCH", "DELETE"):
+        if ctype:
+            info["contentType"] = ctype
+        if "multipart/" in ctype:
+            info["multipart"] = True
+            try:
+                info["bodySize"] = int(request.META.get("CONTENT_LENGTH") or 0)
+            except (TypeError, ValueError):
+                pass
+            return info
+        try:
+            body = request.body
+        except Exception:
+            return info
+        size = len(body)
+        info["bodySize"] = size
+        if not size:
+            return info
+        if size > _BODY_SEND_LIMIT:
+            info["truncated"] = True
+        info["body"] = body[:_BODY_SEND_LIMIT].decode("utf-8", "replace")
+        if "application/json" in ctype and size <= _BODY_CAPTURE_LIMIT:
+            try:
+                info["json"] = json.loads(body.decode("utf-8", "replace"))
+            except Exception:
+                pass
+        if "application/x-www-form-urlencoded" in ctype or not ctype:
+            params = _flat_params(getattr(request, "POST", None))
+            if params:
+                info["params"] = params
+        return info
+
+    return info
+
+
 class DjangoNautMiddleware(MiddlewareMixin):
     def __init__(self, get_response):
         super().__init__(get_response)
@@ -73,6 +165,10 @@ class DjangoNautMiddleware(MiddlewareMixin):
                     }
                 )
 
+        try:
+            request_info = _capture_request(request)
+        except Exception:
+            request_info = None
         try:
             with connection.execute_wrapper(wrapper):
                 response = self.get_response(request)
@@ -113,6 +209,7 @@ class DjangoNautMiddleware(MiddlewareMixin):
                     "totalQueries": len(queries),
                     "requestTime": request_time,
                     "totalTime": round(sum(q["time"] for q in queries), 2),
+                    "requestInfo": request_info,
                 },
             )
         return response
@@ -135,6 +232,10 @@ class DjangoNautMiddleware(MiddlewareMixin):
             if "/django/" not in line.filename and "site-packages" not in line.filename:
                 frame = {"file": line.filename, "line": line.lineno, "func": line.name}
                 break
+        try:
+            request_info = _capture_request(request)
+        except Exception:
+            request_info = None
         get_client().send(
             "error",
             {
@@ -145,5 +246,6 @@ class DjangoNautMiddleware(MiddlewareMixin):
                 "message": str(exc)[:2000],
                 "traceback": tb[-20000:],
                 "frame": frame,
+                "requestInfo": request_info,
             },
         )

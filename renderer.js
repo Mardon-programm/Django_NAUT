@@ -4740,6 +4740,7 @@
       q: payload.totalQueries || 0,
       sqlMs: payload.totalTime || 0,
       queries: payload.queries || [],
+      req: payload.requestInfo || null,
     });
     if (nautReqList.length > 200) nautReqList = nautReqList.slice(-200);
     if (nautReqTimer) return;
@@ -4813,17 +4814,41 @@
     if (!box) return;
     const r = nautReqList.find((x) => x.id === id);
     if (!r) return;
-    if (!r.queries.length) { box.innerHTML = '<div class="req-no-sql">No SQL queries executed.</div>'; return; }
-    const sorted = r.queries.slice().sort((a, b) => (b.time || 0) - (a.time || 0));
-    let html = '<div class="req-detail-title">' + r.q + ' queries · ' + r.sqlMs.toFixed(1) + 'ms total</div>';
-    for (const qr of sorted) {
-      const loc = qr.stack && qr.stack.file ? (qr.stack.file.split(/[/\\]/).pop() + ':' + qr.stack.line) : '';
-      html += '<div class="req-query' + ((qr.time || 0) >= nautProfSlowThreshold ? ' slow' : '') + '"' +
-        (qr.stack && qr.stack.file ? ' data-file="' + escapeHtml(qr.stack.file) + '" data-line="' + (qr.stack.line || 1) + '"' : '') + '>' +
-        '<span class="req-query-time">' + (qr.time || 0).toFixed(1) + 'ms</span> ' +
-        '<code>' + escapeHtml((qr.sql || '').replace(/\s+/g, ' ')) + '</code>' +
-        (loc ? '<div class="sec-file">' + escapeHtml(loc) + '</div>' : '') +
-      '</div>';
+    let html = '';
+    const ri = r.req;
+    if (ri) {
+      html += '<div class="req-detail-title">Request</div>';
+      if (ri.headers) html += nautReqKvBlock('Headers', ri.headers);
+      if (ri.params) html += nautReqKvBlock('Params', ri.params);
+      if (ri.json != null) {
+        html += '<div class="req-body"><div class="req-body-label">JSON body' +
+          (ri.contentType ? ' · ' + escapeHtml(ri.contentType) : '') +
+          (ri.truncated ? ' · truncated' : '') + '</div><pre>' +
+          escapeHtml(JSON.stringify(ri.json, null, 2)) + '</pre></div>';
+      } else if (ri.body) {
+        html += '<div class="req-body"><div class="req-body-label">Body' +
+          (ri.contentType ? ' · ' + escapeHtml(ri.contentType) : '') +
+          (ri.truncated ? ' · truncated' : '') + '</div><pre>' +
+          escapeHtml(ri.body) + '</pre></div>';
+      } else if (ri.multipart) {
+        html += '<div class="req-body"><div class="req-body-label">Multipart upload</div>' +
+          '<pre>' + escapeHtml(ri.contentType || '') + (ri.bodySize ? '\n' + ri.bodySize + ' bytes' : '') + '</pre></div>';
+      }
+    }
+    if (!r.queries.length) {
+      html += '<div class="req-no-sql">' + (ri ? 'No SQL queries executed.' : 'No request data or SQL queries.') + '</div>';
+    } else {
+      const sorted = r.queries.slice().sort((a, b) => (b.time || 0) - (a.time || 0));
+      html += '<div class="req-detail-title">' + r.q + ' queries · ' + r.sqlMs.toFixed(1) + 'ms total</div>';
+      for (const qr of sorted) {
+        const loc = qr.stack && qr.stack.file ? (qr.stack.file.split(/[/\\]/).pop() + ':' + qr.stack.line) : '';
+        html += '<div class="req-query' + ((qr.time || 0) >= nautProfSlowThreshold ? ' slow' : '') + '"' +
+          (qr.stack && qr.stack.file ? ' data-file="' + escapeHtml(qr.stack.file) + '" data-line="' + (qr.stack.line || 1) + '"' : '') + '>' +
+          '<span class="req-query-time">' + (qr.time || 0).toFixed(1) + 'ms</span> ' +
+          '<code>' + escapeHtml((qr.sql || '').replace(/\s+/g, ' ')) + '</code>' +
+          (loc ? '<div class="sec-file">' + escapeHtml(loc) + '</div>' : '') +
+        '</div>';
+      }
     }
     box.innerHTML = html;
     box.querySelectorAll('.req-query').forEach((item) => {
@@ -4831,6 +4856,16 @@
         if (item.dataset.file) nautGoto(item.dataset.file, parseInt(item.dataset.line, 10) || 1);
       });
     });
+  }
+
+  function nautReqKvBlock(title, obj) {
+    let html = '<div class="req-kv"><div class="req-body-label">' + escapeHtml(title) + '</div>';
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      const val = Array.isArray(v) ? v.map(escapeHtml).join(', ') : escapeHtml(String(v));
+      html += '<div class="req-kv-row"><span class="req-kv-k">' + escapeHtml(k) + '</span><span class="req-kv-v">' + val + '</span></div>';
+    }
+    return html + '</div>';
   }
 
   function nautClearRequests() {

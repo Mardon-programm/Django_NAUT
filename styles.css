@@ -3353,6 +3353,48 @@ body {
   color: var(--yellow, #d29922);
   font-size: 9.5px;
 }
+.req-kv {
+  margin-bottom: 6px;
+}
+.req-kv-row {
+  display: flex;
+  gap: 8px;
+  padding: 1px 0;
+  font-size: 10.5px;
+  word-break: break-word;
+}
+.req-kv-k {
+  flex: 0 0 auto;
+  min-width: 90px;
+  color: var(--text-dim, #9aa4af);
+}
+.req-kv-v {
+  color: var(--green, #4ec9b0);
+  font-family: var(--mono, Consolas, monospace);
+}
+.req-body {
+  margin-bottom: 6px;
+}
+.req-body-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim, #9aa4af);
+  margin-bottom: 2px;
+}
+.req-body pre {
+  margin: 0;
+  padding: 5px 6px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 3px;
+  font-family: var(--mono, Consolas, monospace);
+  font-size: 10.5px;
+  color: var(--text, #d6dde3);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}
 
 /* Template inspector */
 .tpl-shadowed {
