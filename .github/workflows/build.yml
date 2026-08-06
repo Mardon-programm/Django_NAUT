@@ -2,12 +2,29 @@ name: Build DjangoNAUT
 
 on:
   push:
+    branches:
+      - master
     tags:
       - 'v*'
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - run: npm test
+
   build-windows:
+    needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +45,7 @@ jobs:
           if-no-files-found: error
 
   build-macos:
+    needs: test
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,6 +68,7 @@ jobs:
           if-no-files-found: error
 
   build-linux:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
