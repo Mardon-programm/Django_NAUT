@@ -294,7 +294,10 @@
     watcherRefreshTimer = setTimeout(function () {
       refreshFileTree();
       const fn = String(data.filename || '').toLowerCase();
-      if (fn.includes('migration') || fn.endsWith('.py')) nautRefreshMigrations();
+      if (fn.includes('migration') || fn.endsWith('.py')) {
+        nautRefreshMigrations();
+        nautCheckDrift(1500);
+      }
     }, 800);
   });
 
@@ -4308,20 +4311,16 @@
     let res;
     try { res = await window.api.migration.scan(currentFolder); } catch (e) { return; }
 
-    const statusEl = $('#status-migration');
-    const hasConflict = (res.conflicts && res.conflicts.length) || (res.brokenDeps && res.brokenDeps.length);
-    if (statusEl) {
-      if (hasConflict) {
-        statusEl.style.display = '';
-        statusEl.style.color = 'var(--red)';
-        statusEl.textContent = '⚠️ Migration conflict! (' + ((res.conflicts.length || 0) + (res.brokenDeps.length || 0)) + ')';
-        statusEl.onclick = () => switchToPanel('migrations');
-      } else {
-        statusEl.style.display = 'none';
-      }
-    }
+    _migrationConflicts = (res.conflicts ? res.conflicts.length : 0) + (res.brokenDeps ? res.brokenDeps.length : 0);
+    nautUpdateMigrationStatus();
 
     let html = '<div class="mig-summary">' + res.migrations.length + ' migrations · ' + (res.conflicts.length || 0) + ' branch conflicts · ' + (res.brokenDeps.length || 0) + ' broken deps</div>';
+
+    if (_migrationDrift && _migrationDrift.drift) {
+      const n = (_migrationDrift.changes || []).length;
+      html += '<div class="mig-drift-banner">\u26A0\uFE0F Model drift — ' + n + ' pending change' + (n === 1 ? '' : 's') + ' (models don\u2019t match migrations).' +
+        ' <button class="mig-fix-btn" id="btn-view-drift">View drift</button></div>';
+    }
 
     if (res.conflicts && res.conflicts.length) {
       html += '<div class="mig-section-title" style="color:var(--red)">Branch conflicts</div>';
@@ -4350,8 +4349,11 @@
     }
     el.innerHTML = html || '<div class="bug-empty"><p>No migrations found.</p></div>';
     el.querySelectorAll('.mig-fix-btn').forEach((btn) => {
+      if (btn.id === 'btn-view-drift') return;
       btn.addEventListener('click', () => nautFixMigration({ app: btn.dataset.app, number: btn.dataset.number, name: btn.dataset.name }, btn));
     });
+    const driftBtn = el.querySelector('#btn-view-drift');
+    if (driftBtn) driftBtn.addEventListener('click', nautOpenDrift);
   }
 
   async function nautFixMigration(target, btn) {
@@ -4374,6 +4376,56 @@
   }
 
   let _migrationView = 'list';
+  let _migrationConflicts = 0;
+  let _migrationDrift = null;
+  let _migrationDriftTimer = null;
+  let _migrationDriftRunning = false;
+
+  function nautUpdateMigrationStatus() {
+    const statusEl = $('#status-migration');
+    if (!statusEl) return;
+    if (_migrationConflicts) {
+      statusEl.style.display = '';
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = '\u26A0\uFE0F Migration conflict! (' + _migrationConflicts + ')';
+      statusEl.onclick = () => { _migrationView = 'list'; switchToPanel('migrations'); };
+      return;
+    }
+    if (_migrationDrift && _migrationDrift.drift) {
+      statusEl.style.display = '';
+      statusEl.style.color = 'var(--yellow)';
+      statusEl.textContent = '\u26A0\uFE0F Model drift (' + (_migrationDrift.changes || []).length + ')';
+      statusEl.onclick = nautOpenDrift;
+      return;
+    }
+    statusEl.style.display = 'none';
+  }
+
+  function nautOpenDrift() {
+    _migrationView = 'drift';
+    switchToPanel('migrations');
+    nautRunMigrationDrift();
+  }
+
+  function nautCheckDrift(debounceMs) {
+    if (!currentFolder) return;
+    if (_migrationDriftTimer) { clearTimeout(_migrationDriftTimer); _migrationDriftTimer = null; }
+    if (debounceMs) {
+      _migrationDriftTimer = setTimeout(() => { _migrationDriftTimer = null; nautCheckDrift(0); }, debounceMs);
+      return;
+    }
+    if (_migrationDriftRunning) return;
+    _migrationDriftRunning = true;
+    let res = null;
+    window.api.migration.drift(currentFolder)
+      .then((r) => { res = r; _migrationDrift = (r && r.ok !== undefined) ? r : null; })
+      .catch(() => { _migrationDrift = null; })
+      .finally(() => {
+        _migrationDriftRunning = false;
+        nautUpdateMigrationStatus();
+        if (_migrationView === 'drift' && res) nautRunMigrationDrift();
+      });
+  }
 
   function nautToggleMigrationView(view) {
     if (_migrationView === view) {
@@ -5361,6 +5413,7 @@
       if (pl) pl.textContent = 'Port: ' + (st.port || '—');
     } catch (e) {}
     nautRefreshMigrations();
+    nautCheckDrift(600);
     nautRefreshSignals();
     nautRefreshTasks();
     nautRefreshDeps();

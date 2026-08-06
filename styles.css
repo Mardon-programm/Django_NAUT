@@ -2422,6 +2422,18 @@ body {
   color: var(--text-dim, #9aa4af);
   border-bottom: 1px solid var(--border);
 }
+.mig-drift-banner {
+  margin: 6px 8px;
+  padding: 7px 8px;
+  font-size: 11px;
+  color: var(--yellow, #f0c674);
+  background: rgba(240, 198, 116, 0.08);
+  border: 1px solid rgba(240, 198, 116, 0.35);
+  border-radius: 4px;
+}
+.mig-drift-banner .mig-fix-btn {
+  margin-left: 6px;
+}
 .mig-section-title {
   padding: 8px 10px 4px;
   font-size: 10px;

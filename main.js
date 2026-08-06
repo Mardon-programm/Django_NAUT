@@ -1100,6 +1100,9 @@ ipcMain.handle('migration:graph', (_e, root) => {
 });
 
 ipcMain.handle('migration:drift', async (_e, root) => {
+  if (!root || !fs.existsSync(path.join(root, 'manage.py'))) {
+    return { ok: false, code: -1, stdout: '', stderr: 'No manage.py found', drift: false, noChanges: false, changes: [], output: '' };
+  }
   const res = await shellRPC.runCommand(root, ['manage.py', 'makemigrations', '--check', '--dry-run'], 60000);
   return { ...res, ...migrationGraph.parseDrift(res) };
 });
