@@ -42,7 +42,8 @@ function findSettingsModule(root) {
       if (entry.isDirectory()) {
         stack.push({ dir: full, rel: path.join(rel, entry.name) });
       } else if (entry.name === 'settings.py' && fs.existsSync(path.join(dir, '__init__.py'))) {
-        found.push(rel.split(/[\\/]/).filter(Boolean).join('.'));
+        const base = rel.split(/[\\/]/).filter(Boolean).join('.');
+        found.push(base ? base + '.settings' : 'settings');
       }
     }
   }
@@ -156,4 +157,34 @@ function closeShell(root) {
   }
 }
 
-module.exports = { setAgentDir, getShell, closeShell, findPython, findSettingsModule };
+// Run a one-off command in the project environment (e.g. manage.py ...) and
+// capture stdout/stderr/exit code. Resolves { ok, code, stdout, stderr }.
+function runCommand(root, args, timeoutMs) {
+  return new Promise((resolve) => {
+    const python = findPython(root);
+    const settingsModule = findSettingsModule(root);
+    const env = buildEnv(root, settingsModule);
+    let proc;
+    try {
+      proc = spawn(python, args, { cwd: root, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (err) {
+      resolve({ ok: false, code: -1, stdout: '', stderr: err.message });
+      return;
+    }
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeoutMs || 30000);
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ ok: code === 0, code, stdout, stderr });
+    });
+    proc.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ ok: false, code: -1, stdout, stderr: err.message });
+    });
+  });
+}
+
+module.exports = { setAgentDir, getShell, closeShell, findPython, findSettingsModule, runCommand };

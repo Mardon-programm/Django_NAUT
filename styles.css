@@ -2463,6 +2463,82 @@ body {
   padding: 3px 8px;
   cursor: pointer;
 }
+.mig-drift-output {
+  margin: 4px 10px 10px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--bg-code, rgba(0,0,0,0.35));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.mig-drift-output pre {
+  margin: 0;
+  padding: 8px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text, #d6dde3);
+}
+.mig-graph-scroll {
+  overflow: auto;
+  max-height: calc(100vh - 140px);
+  padding: 10px;
+}
+.mig-graph {
+  position: relative;
+}
+.mig-svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.mig-edge {
+  fill: none;
+  stroke: var(--accent, #4da3ff);
+  stroke-width: 1.5;
+  opacity: 0.55;
+}
+.mig-col-label {
+  position: absolute;
+  top: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim, #9aa4af);
+  white-space: nowrap;
+}
+.mig-node {
+  position: absolute;
+  width: 168px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  background: rgba(128, 128, 128, 0.1);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent, #4da3ff);
+  border-radius: 4px;
+  font-size: 10.5px;
+  color: var(--text, #d6dde3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.mig-node:hover {
+  background: rgba(77, 163, 255, 0.15);
+}
+.mig-node-num {
+  font-family: var(--font-mono, monospace);
+  color: var(--accent, #4da3ff);
+  font-size: 10px;
+  flex-shrink: 0;
+}
 
 /* Celery tasks */
 .task-item {

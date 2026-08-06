@@ -110,6 +110,8 @@ contextBridge.exposeInMainWorld('api', {
   migration: {
     scan: (root) => ipcRenderer.invoke('migration:scan', root),
     fix: (opts) => ipcRenderer.invoke('migration:fix', opts),
+    graph: (root) => ipcRenderer.invoke('migration:graph', root),
+    drift: (root) => ipcRenderer.invoke('migration:drift', root),
   },
 
   signals: {

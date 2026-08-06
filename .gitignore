@@ -3,6 +3,8 @@ dist/
 *.exe
 *.pdb
 .ruff_cache/
+python-agent/build/
+*.egg-info/
 django_editor_v1/
 django_editor_v2/
 .env

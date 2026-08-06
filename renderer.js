@@ -4365,6 +4365,106 @@
     }
   }
 
+  let _migrationView = 'list';
+
+  function nautToggleMigrationView(view) {
+    if (_migrationView === view) {
+      _migrationView = 'list';
+      nautRefreshMigrations();
+      return;
+    }
+    _migrationView = view;
+    if (view === 'drift') nautRunMigrationDrift();
+    else if (view === 'graph') nautRenderMigrationGraph();
+  }
+
+  async function nautRunMigrationDrift() {
+    if (!currentFolder) return;
+    const el = $('#migration-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Running makemigrations --check --dry-run…</p></div>';
+    let res;
+    try { res = await window.api.migration.drift(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (!res || !res.ok) {
+      el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml((res && (res.stderr || res.error)) || 'Drift check failed') + '</p></div>';
+      return;
+    }
+    let html = '<div class="mig-summary">' + (res.drift
+      ? '<span style="color:var(--yellow)">Model drift detected — ' + res.changes.length + ' pending operation' + (res.changes.length === 1 ? '' : 's') + '.</span>'
+      : '<span style="color:var(--green)">No model drift — migrations match models.</span>') + '</div>';
+    if (res.drift) {
+      html += '<div class="mig-section-title" style="color:var(--yellow)">Pending changes</div>';
+      html += '<div class="mig-drift-output"><pre>' + escapeHtml(res.output || '') + '</pre></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  const MIG_GRAPH_MW = 168;
+  const MIG_GRAPH_MH = 32;
+  const MIG_GRAPH_MX = 20;
+  const MIG_GRAPH_MY = 30;
+  const MIG_GRAPH_COLGAP = 46;
+  const MIG_GRAPH_ROWGAP = 16;
+
+  async function nautRenderMigrationGraph() {
+    if (!currentFolder) return;
+    const el = $('#migration-body');
+    if (!el) return;
+    el.innerHTML = '<div class="bug-empty"><p>Building migration graph…</p></div>';
+    let data;
+    try { data = await window.api.migration.graph(currentFolder); } catch (e) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(e.message) + '</p></div>'; return; }
+    if (!data || !data.apps.length) { el.innerHTML = '<div class="bug-empty"><p>No migrations found.</p></div>'; return; }
+
+    const appNames = data.apps.map((a) => a.name);
+    const appIndex = {};
+    appNames.forEach((n, i) => { appIndex[n] = i; });
+
+    const pos = {};
+    let maxRows = 0;
+    data.apps.forEach((app) => {
+      const cx = MIG_GRAPH_MX + appIndex[app.name] * (MIG_GRAPH_MW + MIG_GRAPH_COLGAP);
+      maxRows = Math.max(maxRows, app.migrations.length);
+      app.migrations.forEach((m, i) => { pos[app.name + '/' + m.number] = { x: cx, y: MIG_GRAPH_MY + i * (MIG_GRAPH_MH + MIG_GRAPH_ROWGAP) }; });
+    });
+
+    const W = MIG_GRAPH_MX * 2 + appNames.length * (MIG_GRAPH_MW + MIG_GRAPH_COLGAP);
+    const H = MIG_GRAPH_MY + maxRows * (MIG_GRAPH_MH + MIG_GRAPH_ROWGAP) + 24;
+
+    let edgesSvg = '';
+    for (const e of data.edges) {
+      const f = pos[e.from.app + '/' + e.from.number];
+      const t = pos[e.to.app + '/' + e.to.number];
+      if (!f || !t) continue;
+      const x1 = f.x + MIG_GRAPH_MW, y1 = f.y + MIG_GRAPH_MH / 2;
+      const x2 = t.x, y2 = t.y + MIG_GRAPH_MH / 2;
+      const cx = (x1 + x2) / 2;
+      edgesSvg += '<path d="M' + x1 + ' ' + y1 + ' C ' + cx + ' ' + y1 + ', ' + cx + ' ' + y2 + ', ' + x2 + ' ' + y2 + '" class="mig-edge" marker-end="url(#migArrow)"/>';
+    }
+
+    let labelsHtml = '';
+    appNames.forEach((n, i) => {
+      labelsHtml += '<div class="mig-col-label" style="left:' + (MIG_GRAPH_MX + i * (MIG_GRAPH_MW + MIG_GRAPH_COLGAP)) + 'px">' + escapeHtml(n) + '</div>';
+    });
+
+    let nodesHtml = '';
+    data.apps.forEach((app) => {
+      app.migrations.forEach((m) => {
+        const p = pos[app.name + '/' + m.number];
+        nodesHtml += '<div class="mig-node" data-file="' + escapeHtml(m.file || '') + '" data-line="' + (m.number ? parseInt(m.number, 10) : 1) + '" style="left:' + p.x + 'px;top:' + p.y + 'px"><span class="mig-node-num">' + escapeHtml(m.number) + '</span>' + escapeHtml(m.name) + '</div>';
+      });
+    });
+
+    el.innerHTML = '<div class="mig-graph-scroll"><div class="mig-graph" style="width:' + W + 'px;height:' + H + 'px">' +
+      labelsHtml +
+      '<svg class="mig-svg" width="' + W + '" height="' + H + '">' + edgesSvg +
+      '<defs><marker id="migArrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--accent)"/></marker></defs>' +
+      '</svg>' + nodesHtml + '</div></div>';
+
+    el.querySelectorAll('.mig-node').forEach((node) => {
+      node.addEventListener('click', () => nautGoto(node.dataset.file, parseInt(node.dataset.line, 10) || 1));
+    });
+  }
+
   function switchToPanel(panelId) {
     $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active'));
     $$('.sidebar-panel').forEach((p) => p.classList.remove('active'));
@@ -5280,7 +5380,9 @@
   window.api.telemetry.onEvent((payload) => nautOnTelemetry(payload));
   connectLogSocket();
 
-  $('#btn-migration-scan')?.addEventListener('click', nautRefreshMigrations);
+  $('#btn-migration-scan')?.addEventListener('click', () => { _migrationView = 'list'; nautRefreshMigrations(); });
+  $('#btn-migration-graph')?.addEventListener('click', () => nautToggleMigrationView('graph'));
+  $('#btn-migration-drift')?.addEventListener('click', () => nautToggleMigrationView('drift'));
   $('#btn-task-scan')?.addEventListener('click', nautRefreshTasks);
   $('#btn-signals-scan')?.addEventListener('click', nautRefreshSignals);
   $('#btn-deps-scan')?.addEventListener('click', nautRefreshDeps);

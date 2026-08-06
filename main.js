@@ -15,6 +15,7 @@ const testRunner = require('./test-runner');
 const shellRPC = require('./shell-rpc');
 const deps = require('./deps-updater');
 const cacheInspector = require('./cache-inspector');
+const migrationGraph = require('./migration-graph');
 
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-compositing');
@@ -1031,6 +1032,15 @@ ipcMain.handle('migration:scan', (_e, root) => {
   const conflicts = migrationGuard.checkBranchConflicts(root);
   const brokenDeps = migrationGuard.checkBrokenDeps(migrations);
   return { migrations, conflicts, brokenDeps };
+});
+
+ipcMain.handle('migration:graph', (_e, root) => {
+  return migrationGraph.buildGraph(root);
+});
+
+ipcMain.handle('migration:drift', async (_e, root) => {
+  const res = await shellRPC.runCommand(root, ['manage.py', 'makemigrations', '--check', '--dry-run'], 60000);
+  return { ...res, ...migrationGraph.parseDrift(res) };
 });
 
 ipcMain.handle('migration:fix', (_e, { root, target }) => {
