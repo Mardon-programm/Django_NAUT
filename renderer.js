@@ -4846,9 +4846,18 @@
         (rr.isRedirect ? ' · <span class="req-redirect">redirect</span>' : '') + '</div>';
       const redir = {};
       for (const k of Object.keys(rr)) {
-        if (k !== 'isRedirect') redir[k] = rr[k];
+        if (k !== 'isRedirect' && k !== 'body' && k !== 'bodySize' && k !== 'truncated') redir[k] = rr[k];
       }
       if (Object.keys(redir).length) html += nautReqKvBlock('Headers', redir);
+      if (rr.body) {
+        let bodyText = rr.body;
+        const ct = (rr['Content-Type'] || '');
+        if (ct.indexOf('json') >= 0) {
+          try { bodyText = JSON.stringify(JSON.parse(bodyText), null, 2); } catch (e) {}
+        }
+        html += '<div class="req-body"><div class="req-body-label">Response body' +
+          (rr.truncated ? ' · truncated' : '') + '</div><pre>' + escapeHtml(bodyText) + '</pre></div>';
+      }
     }
     if (!r.queries.length) {
       html += '<div class="req-no-sql">' + (ri ? 'No SQL queries executed.' : 'No request data or SQL queries.') + '</div>';

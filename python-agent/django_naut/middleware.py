@@ -73,6 +73,8 @@ _RESPONSE_HEADERS = (
     "Server",
 )
 
+_RESPONSE_BODY_LIMIT = 16 * 1024
+
 
 def _flat_params(qdict):
     """QueryDict → plain dict, collapsing single-value lists to scalars."""
@@ -149,7 +151,12 @@ def _capture_request(request):
 
 
 def _capture_response(response):
-    """Snapshot a small subset of response headers for the inspector."""
+    """Snapshot a small subset of response headers + body for the inspector.
+
+    Only fully-buffered responses are read (streaming / file responses are
+    skipped so we never consume their stream). Bodies are sliced at
+    ``_RESPONSE_BODY_LIMIT``.
+    """
     info = {}
     if response is None:
         return info
@@ -165,6 +172,24 @@ def _capture_response(response):
             info[name] = value
     if getattr(response, "is_redirect", False):
         info["isRedirect"] = True
+    try:
+        from django.http.response import StreamingHttpResponse
+
+        if isinstance(response, StreamingHttpResponse):
+            return info
+    except Exception:
+        return info
+    try:
+        content = getattr(response, "content", None)
+        if content is not None:
+            size = len(content)
+            info["bodySize"] = size
+            if size > _RESPONSE_BODY_LIMIT:
+                info["truncated"] = True
+            if size:
+                info["body"] = content[:_RESPONSE_BODY_LIMIT].decode("utf-8", "replace")
+    except Exception:
+        pass
     return info
 
 
