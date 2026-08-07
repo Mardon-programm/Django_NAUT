@@ -50,7 +50,7 @@ npm install && npm start               # или готовый установщ�
 | **Middleware** | Pipeline request→response, хуки, async-детекция |
 | **i18n** | Здоровье `.po`-каталогов, untranslated/fuzzy/obsolete, usage в шаблонах и коде, missing-строки |
 | **Admin** | Зарегистрированные ModelAdmin, опции, inlines, незарегистрированные админки |
-| **DRF** | Роутеры, viewsets, serializers, permission/pagination |
+| **DRF** | Роутеры, viewsets, serializers, permission/pagination; **Send to API Client** — тестовые CRUD-эндпоинты под каждый роутер без Postman |
 | **Migration Guard** | Граф миграций, конфликты веток, автопочинка; проверка дрейфа моделей (`makemigrations --check`) |
 
 ### Отладка и производительность

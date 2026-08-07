@@ -4607,3 +4607,20 @@ body {
 
 .bug-item.fixed .bug-title { text-decoration: line-through; opacity: 0.6; }
 .bug-fix-ok { margin-top: 4px; font-size: 10px; color: var(--green); }
+
+/* DRF Explorer: endpoint tree + Send to API Client */
+.drf-basebar { display: flex; align-items: center; gap: 6px; padding: 2px 10px 8px; }
+.drf-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); flex-shrink: 0; }
+.drf-basebar input { flex: 1; min-width: 0; background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 11px; padding: 3px 6px; }
+.drf-toggle { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--accent); font-size: 11px; padding: 2px 8px; cursor: pointer; opacity: 0.9; }
+.drf-toggle:hover { opacity: 1; text-decoration: underline; }
+.drf-endpoints { padding: 2px 8px 6px 16px; border-left: 2px solid var(--border); margin: 0 8px; }
+.drf-ep { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11px; }
+.drf-ep-method { display: inline-block; width: 52px; text-align: center; font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 0; flex-shrink: 0; }
+.drf-ep-method.get { background: rgba(78, 201, 176, 0.18); color: var(--green); }
+.drf-ep-method.post { background: rgba(94, 156, 246, 0.18); color: var(--accent); }
+.drf-ep-method.put, .drf-ep-method.patch { background: rgba(234, 179, 8, 0.18); color: var(--yellow); }
+.drf-ep-method.delete { background: rgba(239, 83, 80, 0.18); color: var(--red); }
+.drf-ep code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.drf-send { background: none; border: 1px solid var(--accent); color: var(--accent); border-radius: 3px; font-size: 10px; padding: 1px 8px; cursor: pointer; flex-shrink: 0; }
+.drf-send:hover { background: rgba(94, 156, 246, 0.2); }

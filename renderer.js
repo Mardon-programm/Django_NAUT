@@ -7406,6 +7406,17 @@
 
   async function nautRefreshDrf() {
     if (!currentFolder) return;
+    const baseInput = $('#drf-base-url');
+    if (baseInput) {
+      baseInput.value = nautDrfBaseUrl();
+      if (!baseInput.dataset.wired) {
+        baseInput.dataset.wired = '1';
+        baseInput.addEventListener('input', () => {
+          localStorage.setItem('naut_drf_base_url', baseInput.value.trim() || 'http://127.0.0.1:8000');
+          nautRenderDrf();
+        });
+      }
+    }
     const el = $('#drf-body');
     if (!el) return;
     el.innerHTML = '<div class="bug-empty"><p>Scanning REST framework…</p></div>';
@@ -7416,6 +7427,63 @@
     if (data.error) { el.innerHTML = '<div class="bug-empty"><p>' + escapeHtml(String(data.error).split('\n').pop()) + '</p></div>'; return; }
     _drfData = data;
     nautRenderDrf();
+  }
+
+  // Build the standard DRF router endpoints for a route prefix. Pure and
+  // testable: returns [{ method, url }, ...] for list/create/retrieve/update/
+  // partial_update/destroy (the DefaultRouter URL patterns).
+  function nautDrfEndpointUrls(prefix, baseUrl) {
+    const actions = [
+      { method: 'GET', suffix: '' },
+      { method: 'POST', suffix: '' },
+      { method: 'GET', suffix: '{id}/' },
+      { method: 'PUT', suffix: '{id}/' },
+      { method: 'PATCH', suffix: '{id}/' },
+      { method: 'DELETE', suffix: '{id}/' },
+    ];
+    const cleanBase = String(baseUrl || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+    const p = String(prefix || '').replace(/^\/+|\/+$/g, '');
+    const base = cleanBase + (p ? '/' + p : '');
+    return actions.map((a) => ({ method: a.method, url: a.suffix ? base + '/' + a.suffix : base + '/' }));
+  }
+
+  function nautDrfBaseUrl() {
+    let b = localStorage.getItem('naut_drf_base_url');
+    if (!b) { b = 'http://127.0.0.1:8000'; localStorage.setItem('naut_drf_base_url', b); }
+    return b.replace(/\/+$/, '');
+  }
+
+  function nautDrfEndpointsHtml(prefix) {
+    return nautDrfEndpointUrls(prefix, nautDrfBaseUrl()).map((ep) => {
+      const display = ep.url.replace('{id}', ':id');
+      return '<div class="drf-ep">' +
+        '<span class="drf-ep-method ' + ep.method.toLowerCase() + '">' + ep.method + '</span>' +
+        '<code>' + escapeHtml(display) + '</code>' +
+        '<button class="drf-send" data-method="' + ep.method + '" data-url="' + escapeHtml(ep.url) + '" title="Open in API Client">Send</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  // Open the API Client prefilled with method+URL. Safe methods (GET/HEAD/
+  // OPTIONS) are sent immediately; state-changing ones are prepped for review.
+  function nautDrfSend(method, url) {
+    const m = $('#api-method');
+    const u = $('#api-url');
+    const b = $('#api-body');
+    if (m) m.value = method;
+    if (u) u.value = url;
+    if (b && (method === 'POST' || method === 'PUT' || method === 'PATCH')) b.value = '{\n  \n}';
+    $$('.activity-icon[data-panel]').forEach((x) => x.classList.remove('active'));
+    $$('.sidebar-panel').forEach((x) => x.classList.remove('active'));
+    const icon = document.querySelector('.activity-icon[data-panel="apiclient"]');
+    const panel = $('#panel-apiclient');
+    if (icon) icon.classList.add('active');
+    if (panel) panel.classList.add('active');
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+      setTimeout(() => { try { sendApiRequest(); } catch (e) {} }, 60);
+    } else if (u) {
+      u.focus();
+    }
   }
 
   function nautRenderDrf() {
@@ -7443,10 +7511,17 @@
     }
     if (data.routers && data.routers.length) {
       html += '<div class="orm-subtitle">Routers (' + data.routers.length + ')</div>';
-      for (const rt of data.routers) {
+      for (let ri = 0; ri < data.routers.length; ri++) {
+        const rt = data.routers[ri];
         html += '<div class="mw-pipeline"><div class="cmd-line"><span class="cmd-name">' + escapeHtml(rt.var) + '</span><span class="cmd-app mw-proj">' + escapeHtml(rt.type) + '</span></div>';
-        for (const r of rt.routes) {
+        for (let i = 0; i < rt.routes.length; i++) {
+          const r = rt.routes[i];
           html += '<div class="cmd-line"><span class="drf-prefix">/' + escapeHtml(r.prefix) + '</span> <span class="cmd-chip mw-idx">→</span> <span class="adm-admin">' + escapeHtml(r.viewset) + '</span>' + (r.basename ? '<span class="cmd-chip mw-idx">' + escapeHtml(r.basename) + '</span>' : '') + '</div>';
+          const eps = nautDrfEndpointsHtml(r.prefix);
+          if (eps) {
+            html += '<button class="drf-toggle" data-target="drf-ep-' + ri + '-' + i + '">\u25B8 Test endpoints (' + nautDrfEndpointUrls(r.prefix, nautDrfBaseUrl()).length + ') — no Postman needed</button>' +
+              '<div class="drf-endpoints" id="drf-ep-' + ri + '-' + i + '" style="display:none">' + eps + '</div>';
+          }
         }
         html += '</div>';
       }
@@ -7490,6 +7565,21 @@
     el.querySelectorAll('[data-open]').forEach((row) => {
       if (!row.dataset.open) return;
       row.addEventListener('click', () => nautGoto(row.dataset.open, 1));
+    });
+    el.querySelectorAll('.drf-toggle').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = document.getElementById(btn.dataset.target);
+        if (!target) return;
+        const open = target.style.display !== 'none';
+        target.style.display = open ? 'none' : 'block';
+        btn.textContent = (open ? '\u25B8' : '\u25BE') + btn.textContent.slice(1);
+      });
+    });
+    el.querySelectorAll('.drf-send').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        nautDrfSend(btn.dataset.method, btn.dataset.url);
+      });
     });
   }
 
