@@ -88,6 +88,23 @@ function checkNPlusOne(scan) {
     const lines = content.split('\n');
     const loops = [];
 
+    const checkFkAccess = (trimmed, lineNo) => {
+      const fkAccess = trimmed.match(/\.(\w+)(?![\(\w])/);
+      if (!fkAccess) return;
+      const name = fkAccess[1];
+      if (scan.models.some((m) => m.fields.some((f) => f.isForeignKey && f.name === name))) {
+        issues.push({
+          severity: 'performance',
+          category: 'N+1 Query',
+          title: `Potential N+1 on "${name}" access`,
+          message: `Accessing .${name} at line ${lineNo}. This triggers a separate query per iteration.`,
+          file: view.filePath,
+          line: lineNo,
+          fix: `Auto-add select_related('${name}') to the queryset in this function.`,
+        });
+      }
+    };
+
     for (let i = 0; i < lines.length; i++) {
       const raw = lines[i];
       const trimmed = raw.trim();
@@ -100,23 +117,14 @@ function checkNPlusOne(scan) {
         loops.push({ indent, line: i + 1 });
       }
 
+      // List/dict/set comprehension iterates per row: [x.author for x in items]
+      if (/\[[^\]]*\bfor\s+\w+\s+in\b/.test(trimmed) || /^\{[^\}]*\bfor\s+\w+\s+in\b/.test(trimmed)) {
+        checkFkAccess(trimmed, i + 1);
+      }
+
       if (!loops.length) continue;
 
-      const fkAccess = trimmed.match(/\.(\w+)(?![\(\w])/);
-      if (fkAccess) {
-        const name = fkAccess[1];
-        if (scan.models.some((m) => m.fields.some((f) => f.isForeignKey && f.name === name))) {
-          issues.push({
-            severity: 'performance',
-            category: 'N+1 Query',
-            title: `Potential N+1 on "${name}" access`,
-            message: `Accessing .${name} inside a loop at line ${i + 1}. This triggers a separate query per iteration.`,
-            file: view.filePath,
-            line: i + 1,
-            fix: `Auto-add select_related('${name}') to the queryset in this function.`,
-          });
-        }
-      }
+      checkFkAccess(trimmed, i + 1);
 
       if (/\.objects\.(all|filter|exclude|get|first)\(/.test(trimmed)) {
         issues.push({

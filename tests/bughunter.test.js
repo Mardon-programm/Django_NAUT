@@ -202,3 +202,24 @@ test('N+1 auto-fix skips multi-line querysets and non-queryset code safely', () 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('N+1 detected and auto-fixed in list comprehension', () => {
+  const { tmp, scan, viewsPath } = makeProject();
+  try {
+    let vw = fs.readFileSync(viewsPath, 'utf8');
+    vw = vw.replace(
+      '    for p in posts:\n        author_name = p.author.name\n        result.append(author_name)',
+      '    return [p.author.name for p in posts]'
+    );
+    fs.writeFileSync(viewsPath, vw, 'utf8');
+
+    const issues = runBugHunter(scanProject(tmp));
+    const n1 = issues.find((i) => i.title === 'Potential N+1 on "author" access');
+    ok(n1 && n1.fixable, 'comprehension N+1 not detected/fixable');
+    const r = applyFix(n1);
+    ok(r.applied, 'comprehension N+1 fix not applied');
+    ok(fs.readFileSync(viewsPath, 'utf8').includes("posts = Post.objects.all().select_related('author')"), 'select_related not injected for comprehension');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
