@@ -135,3 +135,70 @@ test('auto-fix is safe: removes only the unused line, keeps used imports', () =>
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('N+1 auto-fix injects select_related into the queryset', () => {
+  const { tmp, scan, viewsPath } = makeProject();
+  try {
+    const issues = runBugHunter(scan);
+    const n1 = issues.find((i) => i.title === 'Potential N+1 on "author" access');
+    ok(n1 && n1.fixable, 'N+1 not marked auto-fixable');
+    const r = applyFix(n1);
+    ok(r.applied, 'N+1 fix not applied: ' + (r.reason || ''));
+    const vw = fs.readFileSync(viewsPath, 'utf8');
+    ok(vw.includes("posts = Post.objects.all().select_related('author')"), 'select_related not injected: ' + vw.split('\n')[4]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('N+1 auto-fix merges into existing select_related and skips already-fixed', () => {
+  const { tmp, scan, viewsPath } = makeProject();
+  try {
+    let vw = fs.readFileSync(viewsPath, 'utf8');
+    vw = vw.replace("posts = Post.objects.all()", "posts = Post.objects.all().select_related('user')");
+    fs.writeFileSync(viewsPath, vw, 'utf8');
+
+    const issues1 = runBugHunter(scanProject(tmp));
+    const r1 = applyFix(issues1.find((i) => i.title === 'Potential N+1 on "author" access'));
+    ok(r1.applied, 'merge into existing select_related not applied: ' + (r1.reason || ''));
+    vw = fs.readFileSync(viewsPath, 'utf8');
+    ok(vw.includes("select_related('user', 'author')"), 'did not merge into existing select_related');
+
+    const issues2 = runBugHunter(scanProject(tmp));
+    const r2 = applyFix(issues2.find((i) => i.title === 'Potential N+1 on "author" access'));
+    ok(!r2.applied && /already uses/.test(r2.reason), 'already-fixed N+1 not detected');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('runtime-style N+1 issue with isJoin uses prefetch_related', () => {
+  const { tmp, viewsPath } = makeProject();
+  try {
+    const r = applyFix({ file: viewsPath, line: 9, title: 'Potential N+1 on "tags" access', isJoin: true, fix: 'Auto-add prefetch_related("tags")' });
+    ok(r.applied, 'prefetch fix not applied: ' + (r.reason || ''));
+    ok(fs.readFileSync(viewsPath, 'utf8').includes("posts = Post.objects.all().prefetch_related('tags')"), 'prefetch_related not injected');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('N+1 auto-fix skips multi-line querysets and non-queryset code safely', () => {
+  const { tmp, viewsPath } = makeProject();
+  try {
+    let vw = fs.readFileSync(viewsPath, 'utf8');
+    vw = vw.replace('posts = Post.objects.all()', 'posts = Post.objects.filter(\n        status="p",\n    )');
+    fs.writeFileSync(viewsPath, vw, 'utf8');
+    const r = applyFix({ file: viewsPath, line: 9, title: 'Potential N+1 on "author" access', fix: 'x' });
+    ok(!r.applied && /multiple lines/.test(r.reason), 'multi-line queryset not skipped safely');
+    ok(fs.readFileSync(viewsPath, 'utf8').includes('status="p"'), 'file corrupted by fixer');
+
+    vw = fs.readFileSync(viewsPath, 'utf8');
+    vw = vw.replace('posts = Post.objects.filter(', 'posts = fetch_posts(').replace('        status="p",\n    )', '    )');
+    fs.writeFileSync(viewsPath, vw, 'utf8');
+    const r2 = applyFix({ file: viewsPath, line: 9, title: 'Potential N+1 on "author" access', fix: 'x' });
+    ok(!r2.applied && /no queryset/.test(r2.reason), 'non-queryset call not skipped');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

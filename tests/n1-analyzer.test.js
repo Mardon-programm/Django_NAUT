@@ -3,7 +3,7 @@ const path = require('path');
 const { test, eq, ok, loadFunctions, repoRoot } = require('./lib');
 
 const renderer = path.join(repoRoot(), 'renderer.js');
-const { nautNormalizeSql: norm, nautReqAnalyze: an } = loadFunctions(renderer, ['nautNormalizeSql', 'nautReqAnalyze']);
+const { nautNormalizeSql: norm, nautReqAnalyze: an, nautN1Relation: rel } = loadFunctions(renderer, ['nautNormalizeSql', 'nautReqAnalyze', 'nautN1Relation']);
 
 test('empty request has no groups', () => {
   eq(an({ queries: [] }), { distinct: 0, groups: [], n1: [], n1Queries: 0 });
@@ -82,4 +82,16 @@ test('sql-only stackless queries still analyzed', () => {
 test('null/empty sql entries are ignored', () => {
   const a = an({ queries: [{ sql: null }, { sql: '' }, { sql: '   ' }] });
   eq(a.distinct, 0);
+});
+
+test('nautN1Relation extracts FK relation and join flag from SQL', () => {
+  eq(rel("SELECT * FROM blog_post WHERE author_id = 1 AND status = 'p'"), { name: 'author', isJoin: false });
+  eq(rel("SELECT * FROM orders WHERE customer_id = 7"), { name: 'customer', isJoin: false });
+  eq(rel('SELECT * FROM t WHERE id = 5'), null);
+  eq(rel('SELECT * FROM t'), null);
+});
+
+test('nautN1Relation returns null on ambiguous joins (m2m through-tables)', () => {
+  eq(rel('SELECT t1.id FROM m2m_through t1 INNER JOIN blog_tag t2 ON t1.tag_id = t2.id WHERE t1.post_id = 1'), null);
+  eq(rel('SELECT * FROM t WHERE customer_id = 1 AND order_id = 2'), null);
 });

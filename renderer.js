@@ -5197,6 +5197,18 @@
     };
   }
 
+  // Derive the ORM relation behind a repeated query from its SQL, e.g.
+  // WHERE author_id = N -> { name: 'author', isJoin: false }. Returns null
+  // when the relation is ambiguous (m2m through-tables, multiple FK cols).
+  function nautN1Relation(sql) {
+    const s = String(sql || '');
+    const isJoin = /join/i.test(s);
+    const ids = [...s.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)_id\b/g)].map((m) => m[1]);
+    const uniq = [...new Set(ids)];
+    if (uniq.length !== 1) return null;
+    return { name: uniq[0], isJoin };
+  }
+
   function nautProfilerIngest(payload) {
     const qs = payload.queries || [];
     const view = payload.view || payload.path || '?';
@@ -5366,11 +5378,13 @@
         for (const g of a.n1) {
           const loc = g.stack && g.stack.file ? (g.stack.file.split(/[/\\]/).pop() + ':' + g.stack.line) : '';
           const hint = /join/i.test(g.sql) ? 'many-to-many / reverse relation — use <code>prefetch_related()</code>' : 'related lookup — use <code>select_related()</code>';
+          const rel = g.stack && g.stack.file ? nautN1Relation(g.sql) : null;
           html += '<div class="req-n1-row"' + (g.stack && g.stack.file ? ' data-file="' + escapeHtml(g.stack.file) + '" data-line="' + (g.stack.line || 1) + '"' : '') + '>' +
             '<span class="req-n1-count">\u00D7' + g.count + '</span> ' +
             '<code>' + escapeHtml((g.sql || '').replace(/\s+/g, ' ').slice(0, 140)) + '</code>' +
             '<div class="req-n1-hint">\u2192 ' + hint + '</div>' +
             (loc ? '<div class="sec-file">' + escapeHtml(loc) + '</div>' : '') +
+            (rel ? '<button class="bug-fix-btn req-n1-fix" data-file="' + escapeHtml(g.stack.file) + '" data-line="' + (g.stack.line || 1) + '" data-name="' + escapeHtml(rel.name) + '" data-join="' + (rel.isJoin ? '1' : '0') + '">Auto-fix</button>' : '') +
             '</div>';
         }
         html += '</div>';
@@ -5396,9 +5410,43 @@
         if (item.dataset.file) nautGoto(item.dataset.file, parseInt(item.dataset.line, 10) || 1);
       });
     });
+    box.querySelectorAll('.req-n1-fix').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        nautN1Fix(btn);
+      });
+    });
     box.querySelectorAll('.req-curl').forEach((btn) => {
       btn.addEventListener('click', () => nautReqCopyCurl(parseInt(btn.dataset.curlId, 10), btn));
     });
+  }
+
+  async function nautN1Fix(btn) {
+    const file = btn.dataset.file;
+    const line = parseInt(btn.dataset.line, 10) || 1;
+    const name = btn.dataset.name;
+    const isJoin = btn.dataset.join === '1';
+    const method = isJoin ? 'prefetch_related' : 'select_related';
+    btn.disabled = true;
+    try {
+      const res = await window.api.bug.fix({
+        file,
+        line,
+        title: 'Potential N+1 on "' + name + '" access',
+        isJoin,
+        fix: 'Auto-add ' + method + '("' + name + '")',
+      });
+      if (res && res.applied) {
+        showToast('Auto-fix applied to ' + file.split(/[/\\]/).pop() + ': added .' + method + '("' + name + '")', 'success');
+        termPrint('Auto-fix applied: N+1 on ' + name, 'line-success');
+      } else {
+        showToast('Auto-fix skipped: ' + ((res && res.reason) || 'not applicable'), 'warning');
+        btn.disabled = false;
+      }
+    } catch (e) {
+      showToast('Auto-fix failed: ' + e.message, 'error');
+      btn.disabled = false;
+    }
   }
 
   function nautReqCurl(id) {

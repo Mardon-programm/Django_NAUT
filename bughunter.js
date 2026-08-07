@@ -113,7 +113,7 @@ function checkNPlusOne(scan) {
             message: `Accessing .${name} inside a loop at line ${i + 1}. This triggers a separate query per iteration.`,
             file: view.filePath,
             line: i + 1,
-            fix: `Use select_related('${name}') or prefetch_related('${name}').`,
+            fix: `Auto-add select_related('${name}') to the queryset in this function.`,
           });
         }
       }
@@ -347,12 +347,58 @@ function checkLargeFiles(scan) {
   return issues;
 }
 
+// ── N+1 auto-fix: insert select_related()/prefetch_related() ──────────────
+// Locates the queryset nearest above the offending line and appends the
+// relation so the loop no longer triggers one query per row.
+
+function findQuerysetLine(lines, lineIndex) {
+  for (let i = lineIndex; i >= 0; i--) {
+    const l = lines[i];
+    if (/^\s*(def|class)\b/.test(l)) break;
+    if (/\.objects\.(all|filter|exclude)\s*\(/.test(l)) return i;
+  }
+  return -1;
+}
+
+function applyNPlusOneFix(issue, name, content) {
+  const lines = content.split('\n');
+  const accessLine = Math.max(0, (issue.line || 1) - 1);
+  const qIndex = findQuerysetLine(lines, accessLine);
+  if (qIndex === -1) return { applied: false, reason: 'no queryset found above line ' + (issue.line || 1) };
+  const raw = lines[qIndex];
+  const trimmed = raw.trim();
+  if (raw.includes('#')) return { applied: false, reason: 'queryset line has a trailing comment, skipping' };
+  if (trimmed.endsWith('(') || !/\)\s*$/.test(trimmed)) return { applied: false, reason: 'queryset spans multiple lines, skipping' };
+
+  const isJoin = !!issue.isJoin;
+  const method = isJoin ? 'prefetch_related' : 'select_related';
+  const quoted = "'" + name + "'";
+
+  const calls = raw.match(/\.(select_related|prefetch_related)\(([^)]*)\)/g) || [];
+  if (calls.some((c) => c.includes("'" + name + "'") || c.includes('"' + name + '"'))) {
+    return { applied: false, reason: 'already uses ' + method + '("' + name + '")' };
+  }
+
+  const re = new RegExp('\\.' + method + '\\s*\\(');
+  if (re.test(raw)) {
+    const idx = raw.indexOf('.' + method + '(');
+    const closeParen = raw.indexOf(')', idx + method.length + 2);
+    if (closeParen === -1) return { applied: false, reason: 'malformed ' + method + ' call' };
+    lines[qIndex] = raw.slice(0, closeParen) + ', ' + quoted + raw.slice(closeParen);
+  } else {
+    lines[qIndex] = raw + '.' + method + '(' + quoted + ')';
+  }
+  return { applied: true, content: lines.join('\n'), file: issue.file, line: qIndex + 1 };
+}
+
 // ── Auto-fixable classification ───────────────────────────────────────────
 
 function isAutoFixable(issue) {
-  if (!issue || !issue.fix || !issue.file) return false;
+  if (!issue || !issue.file) return false;
+  if (!issue.fix) return false;
   if (/^Missing on_delete/.test(issue.title)) return true;
   if (/^Unused import/.test(issue.title)) return true;
+  if (/^Potential N\+1 on/.test(issue.title)) return true;
   return false;
 }
 
@@ -397,6 +443,16 @@ function applyFix(issue) {
     const out = lines.filter((l) => l.trim() !== target);
     if (out.length === lines.length) return { applied: false, reason: 'import line not found' };
     content = out.join('\n');
+  }
+
+  // ── N+1: add select_related()/prefetch_related() to the queryset ─────
+  else if (/^Potential N\+1 on/.test(issue.title)) {
+    const m = issue.title.match(/on "([^"]+)"/);
+    const name = m ? m[1] : null;
+    if (!name) return { applied: false, reason: 'relation name not in title' };
+    const res = applyNPlusOneFix(issue, name, content);
+    if (!res.applied) return res;
+    content = res.content;
   }
 
   try {
