@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "channels",  # Django Channels for WebSocket support
     "editor",  # Our editor app
+    "django_naut",  # DjangoNAUT agent (SQL telemetry + error interceptor)
 ]
 
 # ── Middleware ────────────────────────────────────────────────────────────────
