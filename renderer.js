@@ -1994,6 +1994,43 @@
     });
   });
 
+  // ── Collapsible Activity Bar Groups ───────────────────────────────────
+
+  (function initActivityGroups() {
+    const storageKey = 'naut_activity_groups_collapsed';
+    let collapsedGroups = [];
+    try {
+      collapsedGroups = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    } catch (e) {
+      collapsedGroups = [];
+    }
+    if (!Array.isArray(collapsedGroups)) collapsedGroups = [];
+
+    const seps = $$('.activity-bar-top .activity-sep');
+
+    function setGroupCollapsed(sep, collapsed) {
+      const title = sep.textContent.trim();
+      sep.classList.toggle('collapsed', collapsed);
+      let node = sep.nextElementSibling;
+      while (node && !node.classList.contains('activity-sep')) {
+        if (node.classList.contains('activity-icon')) {
+          node.classList.toggle('group-hidden', collapsed);
+        }
+        node = node.nextElementSibling;
+      }
+      collapsedGroups = collapsed ? Array.from(new Set([...collapsedGroups, title]))
+        : collapsedGroups.filter((t) => t !== title);
+      localStorage.setItem(storageKey, JSON.stringify(collapsedGroups));
+    }
+
+    seps.forEach((sep) => {
+      if (collapsedGroups.includes(sep.textContent.trim())) setGroupCollapsed(sep, true);
+      sep.addEventListener('click', () => {
+        setGroupCollapsed(sep, !sep.classList.contains('collapsed'));
+      });
+    });
+  })();
+
   // ── Bottom Panel Tabs ─────────────────────────────────────────────────
 
   $$('.panel-tab[data-bpanel]').forEach((tab) => {
