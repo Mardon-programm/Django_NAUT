@@ -1,5 +1,8 @@
+const fs = require('node:fs');
 const path = require('node:path');
 const { readFileSafe } = require('./django-scanner');
+
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Severity: error, warning, info, performance, security
 
@@ -347,6 +350,85 @@ function checkLargeFiles(scan) {
   return issues;
 }
 
+// ── Auto-fixable classification ───────────────────────────────────────────
+
+function isAutoFixable(issue) {
+  if (!issue || !issue.fix || !issue.file) return false;
+  if (/^Missing on_delete/.test(issue.title)) return true;
+  if (/may need an index/.test(issue.title)) return true;
+  if (/^Unused import/.test(issue.title)) return true;
+  return false;
+}
+
+// Apply a mechanical, reversible fix for supported issue categories.
+// Returns { applied: boolean, reason?: string }.
+function applyFix(issue) {
+  if (!issue || !issue.file || !isAutoFixable(issue)) {
+    return { applied: false, reason: 'not auto-fixable' };
+  }
+
+  let content;
+  try {
+    content = fs.readFileSync(issue.file, 'utf8');
+  } catch (err) {
+    return { applied: false, reason: 'unreadable file: ' + err.message };
+  }
+
+  // ── Missing on_delete ────────────────────────────────────────────────
+  if (/^Missing on_delete/.test(issue.title)) {
+    const m = issue.title.match(/for "([^"]+)"/);
+    const field = m ? m[1] : null;
+    if (!field) return { applied: false, reason: 'field name not in title' };
+    const re = new RegExp('^\\s*' + escRe(field) + '\\s*=\\s*models\\.(ForeignKey|OneToOneField|ManyToManyField)\\s*\\(', 'm');
+    const match = content.match(re);
+    if (!match) return { applied: false, reason: 'field definition not found' };
+    const lineStart = content.indexOf(match[0]);
+    const lineEnd = content.indexOf('\n', lineStart);
+    const fullLine = content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd);
+    if (fullLine.includes('on_delete')) return { applied: false, reason: 'already has on_delete' };
+    const trimmed = fullLine.trim();
+    if (!/\)\s*$/.test(trimmed) || /,\s*$/.test(trimmed)) return { applied: false, reason: 'multi-line definition, skipping' };
+    const fixed = fullLine.replace(/\)\s*$/, ', on_delete=models.CASCADE)');
+    content = content.slice(0, lineStart) + fixed + content.slice(lineEnd === -1 ? content.length : lineEnd);
+  }
+
+  // ── Missing index ────────────────────────────────────────────────────
+  else if (/may need an index/.test(issue.title)) {
+    const m = issue.title.match(/"([^"]+)"/);
+    const field = m ? m[1] : null;
+    if (!field) return { applied: false, reason: 'field name not in title' };
+    const re = new RegExp('^\\s*' + escRe(field) + '\\s*=\\s*models\\.(ForeignKey|OneToOneField)\\s*\\(', 'm');
+    const match = content.match(re);
+    if (!match) return { applied: false, reason: 'field definition not found' };
+    const lineStart = content.indexOf(match[0]);
+    const lineEnd = content.indexOf('\n', lineStart);
+    const fullLine = content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd);
+    if (fullLine.includes('db_index')) return { applied: false, reason: 'already indexed' };
+    const trimmed = fullLine.trim();
+    if (!/\)\s*$/.test(trimmed) || /,\s*$/.test(trimmed)) return { applied: false, reason: 'multi-line definition, skipping' };
+    const fixed = fullLine.replace(/\)\s*$/, ', db_index=True)');
+    content = content.slice(0, lineStart) + fixed + content.slice(lineEnd === -1 ? content.length : lineEnd);
+  }
+
+  // ── Unused import ────────────────────────────────────────────────────
+  else if (/^Unused import/.test(issue.title)) {
+    const m = issue.fix.match(/Remove:\s*(.+)/);
+    const target = m ? m[1].trim() : null;
+    if (!target) return { applied: false, reason: 'no import line to remove' };
+    const lines = content.split('\n');
+    const out = lines.filter((l) => l.trim() !== target);
+    if (out.length === lines.length) return { applied: false, reason: 'import line not found' };
+    content = out.join('\n');
+  }
+
+  try {
+    fs.writeFileSync(issue.file, content, 'utf8');
+  } catch (err) {
+    return { applied: false, reason: 'write failed: ' + err.message };
+  }
+  return { applied: true };
+}
+
 // ── Run all checks ────────────────────────────────────────────────────────
 
 function runBugHunter(scan) {
@@ -372,7 +454,9 @@ function runBugHunter(scan) {
   const order = { error: 0, warning: 1, performance: 2, info: 3 };
   issues.sort((a, b) => (order[a.severity] ?? 4) - (order[b.severity] ?? 4));
 
+  for (const issue of issues) issue.fixable = isAutoFixable(issue);
+
   return issues;
 }
 
-module.exports = { runBugHunter };
+module.exports = { runBugHunter, isAutoFixable, applyFix };

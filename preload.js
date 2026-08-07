@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld(
 contextBridge.exposeInMainWorld('api', {
   dialog: {
     openFolder: () => ipcRenderer.invoke('dialog:openFolder'),
+    saveFile: (opts) => ipcRenderer.invoke('dialog:saveFile', opts),
   },
 
   fs: {
@@ -65,6 +66,16 @@ contextBridge.exposeInMainWorld('api', {
     scan: (folder) => ipcRenderer.invoke('django:scan', folder),
     bughunt: (folder) => ipcRenderer.invoke('django:bughunt', folder),
     cmd: (opts) => ipcRenderer.invoke('django:cmd', opts),
+  },
+
+  bug: {
+    fix: (issue) => ipcRenderer.invoke('bug:applyFix', { issue }),
+  },
+
+  report: {
+    generate: (root) => ipcRenderer.invoke('report:generate', root),
+    save: (opts) => ipcRenderer.invoke('report:save', opts),
+    pdf: (opts) => ipcRenderer.invoke('report:pdf', opts),
   },
 
   ai: {

@@ -19,6 +19,7 @@
     <!-- Activity Bar -->
     <div class="activity-bar">
       <div class="activity-bar-top">
+        <div class="activity-sep" title="Project">Project</div>
         <button class="activity-icon active" data-panel="explorer" title="Explorer (Ctrl+Shift+E)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -29,45 +30,9 @@
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
         </button>
-        <button class="activity-icon" data-panel="django" title="Django">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>
-            <path d="M8 12h8M12 8v8"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="bughunter" title="Bug Hunter">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="aitests" title="AI Test Generator">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <path d="M9 13l2 2 4-4"/>
-          </svg>
-        </button>
         <button class="activity-icon" data-panel="search" title="Search (Ctrl+Shift+F)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="ai" title="AI Assistant (Ctrl+Shift+A)">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="docker" title="Docker">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="2" y="6" width="20" height="12" rx="2"/>
-            <path d="M6 6V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/>
-            <path d="M2 10h20"/>
-            <path d="M10 10v4M14 10v4M18 10v4"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="apiclient" title="API Client">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-            <line x1="4" y1="22" x2="4" y2="15"/>
           </svg>
         </button>
         <button class="activity-icon" data-panel="deploy" title="Deploy">
@@ -75,72 +40,12 @@
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
         </button>
-        <button class="activity-icon" data-panel="migrations" title="Migrations (Migration Guard)">
+
+        <div class="activity-sep" title="Django">Django</div>
+        <button class="activity-icon" data-panel="django" title="Django">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M3 17l6-6 4 4 8-8"/>
-            <path d="M14 7h7v7"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="tasks" title="Celery Tasks">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="9"/>
-            <path d="M12 7v5l3 3"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="signals" title="Signals Tracer">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="deps" title="Dependencies">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/>
-            <path d="M12 7.5V12m0 0l-4.5 5m4.5-5l4.5 5"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="security" title="Security Scanner">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="M9 12l2 2 4-4"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="tests" title="Test Runner">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="cache" title="Cache Inspector">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 2L20 6v4L12 14 4 10V6l8-4z"/>
-            <path d="M4 14l8 4 8-4"/>
-            <path d="M4 18l8 4 8-4"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="profiler" title="Performance Profiler">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="logs" title="Live Logs">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="7" y1="8" x2="17" y2="8"/>
-            <line x1="7" y1="12" x2="17" y2="12"/>
-            <line x1="7" y1="16" x2="13" y2="16"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="db" title="Database Inspector">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <ellipse cx="12" cy="5" rx="9" ry="3"/>
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="urls" title="URL Inspector">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>
+            <path d="M8 12h8M12 8v8"/>
           </svg>
         </button>
         <button class="activity-icon" data-panel="orm" title="ORM Models">
@@ -149,25 +54,10 @@
             <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
           </svg>
         </button>
-        <button class="activity-icon" data-panel="cfg" title="Settings & Env">
+        <button class="activity-icon" data-panel="urls" title="URL Inspector">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
-            <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
-            <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/>
-            <line x1="17" y1="16" x2="23" y2="16"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="mail" title="Mail Inspector">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
-            <polyline points="22,6 12,13 2,6"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="requests" title="HTTP Requests">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
         </button>
         <button class="activity-icon" data-panel="tpl" title="Templates">
@@ -196,14 +86,13 @@
             <path d="M8 6h8M7.5 7.5 11 16M16.5 7.5 13 16"/>
           </svg>
         </button>
-        <button class="activity-icon" data-panel="commands" title="Manage Commands">
+        <button class="activity-icon" data-panel="cfg" title="Settings & Env">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
-          </svg>
-        </button>
-        <button class="activity-icon" data-panel="mw" title="Middleware">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 2 2 7l10 5 10-5z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>
+            <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+            <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+            <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/>
+            <line x1="17" y1="16" x2="23" y2="16"/>
           </svg>
         </button>
         <button class="activity-icon" data-panel="i18n" title="Translations / i18n">
@@ -222,6 +111,133 @@
         <button class="activity-icon" data-panel="drf" title="REST Framework">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M8 6l-6 6 6 6"/><path d="M16 6l6 6-6 6"/><line x1="13" y1="3" x2="11" y2="21"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="commands" title="Manage Commands">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="mw" title="Middleware">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2 2 7l10 5 10-5z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="requests" title="HTTP Requests">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="mail" title="Mail Inspector">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </button>
+
+        <div class="activity-sep" title="Quality">Quality</div>
+        <button class="activity-icon" data-panel="bughunter" title="Bug Hunter — finds & fixes issues">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="security" title="Security Scanner">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="tests" title="Test Runner">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="profiler" title="Performance Profiler">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="deps" title="Dependencies">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/>
+            <path d="M12 7.5V12m0 0l-4.5 5m4.5-5l4.5 5"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="migrations" title="Migrations (Migration Guard)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 17l6-6 4 4 8-8"/>
+            <path d="M14 7h7v7"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="tasks" title="Celery Tasks">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 7v5l3 3"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="signals" title="Signals Tracer">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="cache" title="Cache Inspector">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2L20 6v4L12 14 4 10V6l8-4z"/>
+            <path d="M4 14l8 4 8-4"/>
+            <path d="M4 18l8 4 8-4"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="db" title="Database Inspector">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+        </button>
+
+        <div class="activity-sep" title="Reports">Reports</div>
+        <button class="activity-icon" data-panel="enterprise" title="Audit Report — health score, upgrade cost, dependency risk">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/><path d="M3 20h18"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="logs" title="Live Logs">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="7" y1="8" x2="17" y2="8"/>
+            <line x1="7" y1="12" x2="17" y2="12"/>
+            <line x1="7" y1="16" x2="13" y2="16"/>
+          </svg>
+        </button>
+
+        <div class="activity-sep" title="Runtime">Runtime</div>
+        <button class="activity-icon" data-panel="docker" title="Docker">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="6" width="20" height="12" rx="2"/>
+            <path d="M6 6V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/>
+            <path d="M2 10h20"/>
+            <path d="M10 10v4M14 10v4M18 10v4"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="apiclient" title="API Client">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+            <line x1="4" y1="22" x2="4" y2="15"/>
+          </svg>
+        </button>
+
+        <div class="activity-sep" title="Assistant">Assistant</div>
+        <button class="activity-icon" data-panel="aitests" title="Test Generator">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <path d="M9 13l2 2 4-4"/>
+          </svg>
+        </button>
+        <button class="activity-icon" data-panel="ai" title="Copilot (Ctrl+Shift+A)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
         </button>
       </div>
@@ -339,7 +355,7 @@
                 <line x1="8" y1="12" x2="16" y2="12"/>
               </svg>
             </button>
-            <button id="btn-mock-data" title="Generate Mock Data (AI)">
+            <button id="btn-mock-data" title="Generate Mock Data">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
                 <line x1="4" y1="22" x2="4" y2="15"/>
@@ -387,10 +403,10 @@
         <div class="bug-summary hidden" id="bug-summary"></div>
       </div>
 
-      <!-- AI Test Generator Panel -->
+      <!-- Test Generator Panel -->
       <div class="sidebar-panel" id="panel-aitests">
         <div class="sidebar-header">
-          <span>AI TEST GENERATOR</span>
+          <span>TEST GENERATOR</span>
           <div class="sidebar-header-actions">
             <button id="btn-aitests-save" title="Save tests to file" style="display:none">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -406,7 +422,7 @@
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <path d="M9 13l2 2 4-4"/>
             </svg>
-            <p>Generate pytest tests for your Django project using AI.</p>
+            <p>Generate pytest tests for your Django project.</p>
           </div>
           <button id="btn-aitests-generate" class="btn-primary" style="width:100%;margin:8px 0;">Generate Tests</button>
           <div id="aitests-status" style="font-size:12px;margin-bottom:8px;"></div>
@@ -430,7 +446,7 @@
         </div>
       </div>
 
-      <!-- AI Panel -->
+      <!-- Copilot Panel -->
       <div class="sidebar-panel" id="panel-ai">
         <div class="ai-tabs">
           <button class="ai-tab active" data-aitab="analyze">Analyze</button>
@@ -444,12 +460,12 @@
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
               </svg>
             </div>
-            <p class="ai-welcome-title" id="ai-welcome-title">AI Code Analyzer</p>
+            <p class="ai-welcome-title" id="ai-welcome-title">Code Analyzer</p>
             <p class="ai-welcome-desc" id="ai-welcome-desc">Ask about your code and get expert Django advice.</p>
           </div>
         </div>
         <div class="ai-input-area">
-          <textarea class="ai-input" id="ai-input" placeholder="Ask AI..." rows="2"></textarea>
+          <textarea class="ai-input" id="ai-input" placeholder="Ask..." rows="2"></textarea>
           <button class="ai-send-btn" id="ai-send-btn" title="Send (Enter)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
@@ -1271,6 +1287,67 @@
           </div>
         </div>
       </div>
+
+      <!-- Audit & Reports Panel -->
+      <div class="sidebar-panel" id="panel-enterprise">
+        <div class="sidebar-header">
+          <span>REPORTS</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-report-refresh" title="Refresh report">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-body" id="report-body">
+          <div class="enterprise-score-wrap">
+            <div class="enterprise-score" id="enterprise-score">—</div>
+            <div class="enterprise-score-label">Health Score</div>
+          </div>
+          <div class="enterprise-summary" id="enterprise-summary"></div>
+          <div class="enterprise-section">
+            <div class="enterprise-section-title">REPORT</div>
+            <button class="enterprise-btn" id="btn-report-generate">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Build Audit Report
+            </button>
+            <button class="enterprise-btn" id="btn-report-export">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Export Markdown
+            </button>
+            <button class="enterprise-btn" id="btn-report-pdf">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/><polyline points="9 13 11 15 15 11"/>
+              </svg>
+              Export PDF
+            </button>
+          </div>
+          <div class="enterprise-section">
+            <div class="enterprise-section-title">METRICS</div>
+            <div class="enterprise-metrics" id="enterprise-metrics"></div>
+          </div>
+          <div class="enterprise-section">
+            <div class="enterprise-section-title">NOTES</div>
+            <textarea class="enterprise-notes" id="enterprise-notes" rows="3" spellcheck="false" placeholder="Team notes… (included in the exported report)"></textarea>
+            <button class="enterprise-btn" id="btn-notes-save">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save Notes
+            </button>
+          </div>
+          <div class="enterprise-report" id="enterprise-report" style="display:none"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Resize handle -->
@@ -1297,7 +1374,7 @@
             <div class="shortcut"><kbd>Ctrl+P</kbd><span>Quick Open</span></div>
             <div class="shortcut"><kbd>Ctrl+Shift+P</kbd><span>Command Palette</span></div>
             <div class="shortcut"><kbd>Ctrl+Shift+E</kbd><span>Explorer</span></div>
-            <div class="shortcut"><kbd>Ctrl+Shift+A</kbd><span>AI Assistant</span></div>
+            <div class="shortcut"><kbd>Ctrl+Shift+A</kbd><span>Copilot</span></div>
             <div class="shortcut"><kbd>Ctrl+G</kbd><span>Go to Line</span></div>
           </div>
         </div>

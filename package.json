@@ -35,6 +35,7 @@
       "log-server.js",
       "django-scanner.js",
       "bughunter.js",
+      "report-generator.js",
       "telemetry-server.js",
       "migration-guard.js",
       "migration-graph.js",

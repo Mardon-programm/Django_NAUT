@@ -10,6 +10,9 @@
   let scanData = null;
   let groqApiKey = localStorage.getItem('groq_api_key') || '';
   let lastBugIssues = [];
+  let lastBugCounts = { total: 0, fixable: 0, fixed: 0 };
+  let lastBugScanMs = 0;
+  let nautTestStats = null;
   let currentAiTab = 'analyze';
   let aiBusy = false;
   let shellType = localStorage.getItem('terminal_shell') || 'cmd';
@@ -2700,7 +2703,15 @@
     buildDjangoTree(result.scan);
     buildDjangoManagementButtons();
 
-    if (result.issues.length === 0) {
+    lastBugIssues = result.issues || [];
+    lastBugCounts = {
+      total: lastBugIssues.length,
+      fixable: (result.counts && result.counts.fixable) || lastBugIssues.filter((i) => i.fixable).length,
+      fixed: 0,
+    };
+    lastBugScanMs = result.scanMs || 0;
+
+    if (lastBugIssues.length === 0) {
       bugList.innerHTML = `
         <div class="bug-empty">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ec9b0" stroke-width="1.5">
@@ -2709,6 +2720,7 @@
           </svg>
           <p style="color: var(--green);">No issues found!</p>
         </div>`;
+      nautUpdateBugSummary();
       updateProblemsBadge(0);
       updateProblemsPanel([]);
       updateStatusBarCounts(0, 0);
@@ -2716,18 +2728,18 @@
     }
 
     bugList.innerHTML = '';
-    const errors = result.issues.filter((i) => i.severity === 'error').length;
-    const warnings = result.issues.filter((i) => i.severity === 'warning').length;
-    const perfs = result.issues.filter((i) => i.severity === 'performance').length;
-    const infos = result.issues.filter((i) => i.severity === 'info').length;
+    const errors = lastBugIssues.filter((i) => i.severity === 'error').length;
+    const warnings = lastBugIssues.filter((i) => i.severity === 'warning').length;
+    const perfs = lastBugIssues.filter((i) => i.severity === 'performance').length;
+    const infos = lastBugIssues.filter((i) => i.severity === 'info').length;
 
     updateProblemsBadge(errors + warnings);
-    updateProblemsPanel(result.issues);
+    updateProblemsPanel(lastBugIssues);
     updateStatusBarCounts(errors, warnings);
 
-    for (const issue of result.issues) {
+    for (const issue of lastBugIssues) {
       const el = document.createElement('div');
-      el.className = 'bug-item';
+      el.className = 'bug-item' + (issue.fixed ? ' fixed' : '');
       const sevIcon = issue.severity === 'error' ? '\u2716' :
                       issue.severity === 'warning' ? '\u26A0' :
                       issue.severity === 'performance' ? '\u26A1' : '\u2139';
@@ -2739,6 +2751,23 @@
           `<div class="bug-message">${escapeHtml(issue.message)}</div>` +
           (shortFile ? `<div class="bug-file">${escapeHtml(shortFile)}${issue.line ? ':' + issue.line : ''}</div>` : '') +
         `</div>`;
+      if (issue.fixable && !issue.fixed) {
+        const fixBtn = document.createElement('button');
+        fixBtn.className = 'bug-fix-btn';
+        fixBtn.textContent = 'Auto-fix';
+        fixBtn.title = issue.fix || 'Apply mechanical fix';
+        fixBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          nautFixIssue(issue, el);
+        });
+        el.querySelector('.bug-info').appendChild(fixBtn);
+      }
+      if (issue.fixed) {
+        const ok = document.createElement('div');
+        ok.className = 'bug-fix-ok';
+        ok.textContent = 'Fixed';
+        el.querySelector('.bug-info').appendChild(ok);
+      }
       el.addEventListener('click', () => {
         if (issue.file) openFile(issue.file, issue.file.split(/[/\\]/).pop());
       });
@@ -2746,24 +2775,231 @@
     }
 
     bugSummary.classList.remove('hidden');
-    bugSummary.innerHTML =
-      `<div class="counts">` +
-      (errors ? `<span class="count-error">${errors} error${errors > 1 ? 's' : ''}</span>` : '') +
-      (warnings ? `<span class="count-warning">${warnings} warning${warnings > 1 ? 's' : ''}</span>` : '') +
-      (perfs ? `<span style="color:var(--green)">${perfs} performance</span>` : '') +
-      (infos ? `<span class="count-info">${infos} info</span>` : '') +
-      `</div>`;
-
-    lastBugIssues = result.issues;
-
-    const aiBtn = document.createElement('button');
-    aiBtn.className = 'bug-ai-btn';
-    aiBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Deep AI Analysis';
-    aiBtn.addEventListener('click', runBugHunterAI);
-    bugSummary.appendChild(aiBtn);
+    nautUpdateBugSummary();
 
     termPrint(`Bug Hunter: ${result.issues.length} issues found.`, 'line-info');
     outputPrint(`Bug Hunter scan complete: ${result.issues.length} issues`, 'out-info');
+  }
+
+  function nautBugTestLine() {
+    if (!nautTestStats) return '';
+    const total = (nautTestStats.passed || 0) + (nautTestStats.failed || 0) + (nautTestStats.errors || 0);
+    if (!total) return '';
+    const pct = Math.round(((nautTestStats.passed || 0) / total) * 100);
+    const color = pct >= 90 ? 'var(--green)' : pct >= 70 ? 'var(--yellow)' : 'var(--red)';
+    return `<span style="color:${color}">${pct}% tests pass</span>`;
+  }
+
+  function nautUpdateBugSummary() {
+    bugSummary.classList.remove('hidden');
+    const c = lastBugCounts;
+    const timeSec = (lastBugScanMs / 1000).toFixed(1);
+    let html =
+      `<div class="counts">` +
+      `<span class="count-error">${c.total} found</span>` +
+      (c.fixable ? `<span style="color:var(--green)">${c.fixed}/${c.fixable} fixed</span>` : '') +
+      `<span class="count-info">${timeSec}s</span>` +
+      nautBugTestLine() +
+      `</div>`;
+    const errs = lastBugIssues.filter((i) => i.severity === 'error').length;
+    const warns = lastBugIssues.filter((i) => i.severity === 'warning').length;
+    const perfs = lastBugIssues.filter((i) => i.severity === 'performance').length;
+    const infos = lastBugIssues.filter((i) => i.severity === 'info').length;
+    html +=
+      `<div class="counts">` +
+      (errs ? `<span class="count-error">${errs} error${errs > 1 ? 's' : ''}</span>` : '') +
+      (warns ? `<span class="count-warning">${warns} warning${warns > 1 ? 's' : ''}</span>` : '') +
+      (perfs ? `<span style="color:var(--green)">${perfs} performance</span>` : '') +
+      (infos ? `<span class="count-info">${infos} info</span>` : '') +
+      `</div>`;
+    bugSummary.innerHTML = html;
+
+    const aiBtn = document.createElement('button');
+    aiBtn.className = 'bug-ai-btn';
+    aiBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Deep Analysis';
+    aiBtn.title = 'Get detailed explanations and suggested fixes';
+    aiBtn.addEventListener('click', runBugHunterAI);
+    bugSummary.appendChild(aiBtn);
+  }
+
+  async function nautFixIssue(issue, el) {
+    let res;
+    try {
+      res = await window.api.bug.fix(issue);
+    } catch (e) {
+      showToast('Auto-fix failed: ' + e.message, 'error');
+      return;
+    }
+    if (res && res.applied) {
+      lastBugCounts.fixed++;
+      issue.fixed = true;
+      el.classList.add('fixed');
+      const btn = el.querySelector('.bug-fix-btn');
+      if (btn) btn.remove();
+      const ok = document.createElement('div');
+      ok.className = 'bug-fix-ok';
+      ok.textContent = 'Fixed';
+      el.querySelector('.bug-info').appendChild(ok);
+      nautUpdateBugSummary();
+      showToast('Applied fix to ' + (issue.file || '').split(/[/\\]/).pop(), 'success');
+      termPrint('Auto-fix applied: ' + issue.title, 'line-success');
+    } else {
+      showToast('Auto-fix skipped: ' + ((res && res.reason) || 'not applicable'), 'warning');
+    }
+  }
+
+  // ── Enterprise / Reports Panel ─────────────────────────────────────────
+
+  let nautReportState = null;
+
+  async function nautRefreshReport() {
+    if (!currentFolder) {
+      const body = $('#report-body');
+      if (body) body.innerHTML = '<div class="bug-empty"><p>Open a Django project to generate the audit report.</p></div>';
+      return;
+    }
+    const notes = $('#enterprise-notes');
+    if (notes) notes.value = localStorage.getItem('naut_notes_' + nautNorm(currentFolder)) || '';
+    nautRenderReport();
+  }
+
+  async function nautGenerateReport() {
+    if (!currentFolder) return;
+    const score = $('#enterprise-score');
+    const summary = $('#enterprise-summary');
+    if (score) score.textContent = '…';
+    if (summary) summary.innerHTML = '<div class="enterprise-summary">Scanning project…</div>';
+    let res;
+    try {
+      res = await window.api.report.generate(currentFolder);
+    } catch (e) {
+      if (summary) summary.innerHTML = '<div class="enterprise-summary">Report failed: ' + escapeHtml(e.message) + '</div>';
+      return;
+    }
+    nautReportState = res;
+    nautRenderReport();
+  }
+
+  function nautRenderReport() {
+    const score = $('#enterprise-score');
+    const summary = $('#enterprise-summary');
+    const metrics = $('#enterprise-metrics');
+    if (!score || !summary) return;
+    if (!nautReportState) {
+      score.textContent = '—';
+      score.className = 'enterprise-score';
+      summary.innerHTML = '<div class="enterprise-summary">No report yet.</div>';
+      return;
+    }
+    const r = nautReportState.report;
+    score.textContent = r.healthScore + '/100';
+    score.className = 'enterprise-score ' + r.scoreLevel;
+    summary.innerHTML =
+      `<div class="enterprise-summary">` +
+      `Upgrade cost: <b>${nautFormatHours(r.upgradeCostHours)}</b>` +
+      ` · Dependency risk: <b class="risk-${r.dependencyRisk}">${r.dependencyRisk.toUpperCase()}</b>` +
+      (r.testPassPct !== null ? ` · Tests: <b>${r.testPassPct}%</b> pass` : '') +
+      `</div>`;
+    if (metrics) {
+      const c = r.counts;
+      let html = '';
+      html += nautMetric('Critical', c.critical, 'risk-' + (c.critical ? 'high' : 'low'));
+      html += nautMetric('Errors', c.errors, 'risk-' + (c.errors ? 'high' : 'low'));
+      html += nautMetric('Warnings', c.warnings, 'risk-' + (c.warnings ? 'med' : 'low'));
+      html += nautMetric('Performance', c.performance, 'risk-' + (c.performance ? 'med' : 'low'));
+      html += nautMetric('Info', c.info, 'risk-low');
+      html += nautMetric('Outdated deps', r.outdated, 'risk-' + (r.outdated ? 'med' : 'low'));
+      html += nautMetric('Vulnerable deps', r.vulnPkgs, 'risk-' + (r.vulnPkgs ? 'high' : 'low'));
+      html += nautMetric('Scan time', (r.scanMs / 1000).toFixed(1) + 's', 'risk-low');
+      metrics.innerHTML = html;
+    }
+    const reportEl = $('#enterprise-report');
+    if (reportEl) {
+      const md = nautReportState.markdown || '';
+      reportEl.style.display = md ? '' : 'none';
+      if (md) reportEl.innerHTML = '<div class="enterprise-report-title">PREVIEW</div>' + renderMarkdown(md.split('\n').slice(0, 40).join('\n'));
+    }
+  }
+
+  function nautMetric(label, value, cls) {
+    return `<div class="enterprise-metric"><span>${escapeHtml(label)}</span><b class="${cls}">${escapeHtml(String(value))}</b></div>`;
+  }
+
+  function nautFormatHours(h) {
+    const hrs = Math.floor(h);
+    const mins = Math.round((h - hrs) * 60);
+    if (hrs === 0) return mins + ' min';
+    if (mins === 0) return '~' + hrs + ' h';
+    return '~' + hrs + ' h ' + mins + ' min';
+  }
+
+  function nautSaveNotes() {
+    if (!currentFolder) return;
+    const notes = $('#enterprise-notes');
+    if (!notes) return;
+    localStorage.setItem('naut_notes_' + nautNorm(currentFolder), notes.value);
+    showToast('Notes saved.', 'success');
+  }
+
+  async function nautExportMarkdown() {
+    if (!currentFolder) return;
+    let md = nautReportState && nautReportState.markdown;
+    if (!md) {
+      try {
+        const res = await window.api.report.generate(currentFolder);
+        nautReportState = res;
+        md = res.markdown;
+      } catch (e) {
+        showToast('Report failed: ' + e.message, 'error');
+        return;
+      }
+    }
+    const notes = $('#enterprise-notes');
+    const notesText = notes ? notes.value.trim() : '';
+    if (notesText) md += '\n\n## Notes\n\n' + notesText + '\n';
+    const name = nautNorm(currentFolder).split(/[/\\]/).filter(Boolean).pop() || 'project';
+    const filePath = await window.api.dialog.saveFile({ defaultPath: name + '-audit.md', filters: [{ name: 'Markdown', extensions: ['md'] }] });
+    if (!filePath) return;
+    try {
+      await window.api.report.save({ path: filePath, content: md });
+      showToast('Report saved: ' + filePath.split(/[/\\]/).pop(), 'success');
+      termPrint('Audit report exported to ' + filePath, 'line-success');
+    } catch (e) {
+      showToast('Export failed: ' + e.message, 'error');
+    }
+  }
+
+  async function nautExportPdf() {
+    if (!currentFolder) return;
+    if (!nautReportState) {
+      try {
+        const res = await window.api.report.generate(currentFolder);
+        nautReportState = res;
+      } catch (e) {
+        showToast('Report failed: ' + e.message, 'error');
+        return;
+      }
+    }
+    const notes = $('#enterprise-notes');
+    const notesText = notes ? notes.value.trim() : '';
+    const name = nautNorm(currentFolder).split(/[/\\]/).filter(Boolean).pop() || 'project';
+    const filePath = await window.api.dialog.saveFile({ defaultPath: name + '-audit.pdf', filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+    if (!filePath) return;
+    try {
+      await window.api.report.pdf({
+        path: filePath,
+        report: nautReportState.report,
+        issues: nautReportState.issues,
+        security: nautReportState.security,
+        deps: nautReportState.deps,
+        notes: notesText,
+        root: currentFolder,
+      });
+      showToast('PDF saved: ' + filePath.split(/[/\\]/).pop(), 'success');
+      termPrint('Audit PDF exported to ' + filePath, 'line-success');
+    } catch (e) {
+      showToast('PDF export failed: ' + e.message, 'error');
+    }
   }
 
   // ── Simple Markdown Renderer ────────────────────────────────────────
@@ -2787,9 +3023,9 @@
   // ── AI Panel ──────────────────────────────────────────────────────────
 
   const aiTabDescriptions = {
-    analyze: { title: 'AI Code Analyzer', desc: 'Ask about your code and get expert Django advice.' },
-    architect: { title: 'AI Architect', desc: 'Describe a feature and get a full implementation plan.' },
-    memory: { title: 'Django Memory', desc: 'Ask where code is, how components connect, dependencies.' },
+    analyze: { title: 'Code Analyzer', desc: 'Ask about your code and get expert Django advice.' },
+    architect: { title: 'Architect', desc: 'Describe a feature and get a full implementation plan.' },
+    memory: { title: 'Memory', desc: 'Ask where code is, how components connect, dependencies.' },
   };
 
   function switchAiTab(tab) {
@@ -2803,7 +3039,7 @@
       architect: 'Describe the feature you want to build...',
       memory: 'Where is JWT created? How do models connect?',
     };
-    if (aiInput) aiInput.placeholder = placeholders[tab] || 'Ask AI...';
+    if (aiInput) aiInput.placeholder = placeholders[tab] || 'Ask...';
   }
 
   function addAiMessage(role, text) {
@@ -2943,7 +3179,7 @@
           </div>
           <div class="modal-body">
             <div class="settings-section">
-              <div class="settings-section-title">AI Configuration</div>
+              <div class="settings-section-title">Assistant Configuration</div>
               <div class="settings-group">
                 <label class="settings-label">GROQ API Key</label>
                 <input type="password" class="settings-input" id="settings-apikey"
@@ -2951,7 +3187,7 @@
                 <div class="settings-hint">Get your key at console.groq.com. Leave empty for default.</div>
               </div>
               <div class="settings-group">
-                <label class="settings-label">AI Model</label>
+                <label class="settings-label">Model</label>
                 <select class="settings-select" id="settings-model">
                   <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Recommended)</option>
                   <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (Fast)</option>
@@ -3594,9 +3830,9 @@
     'focusTerminal': 'Focus Terminal',
     'explorer': 'Explorer',
     'search': 'Search',
-    'aiAssistant': 'AI Assistant',
+    'aiAssistant': 'Copilot',
     'settings': 'Settings',
-    'lintFile': 'Lint with AI',
+    'lintFile': 'Lint File',
     'quickOpen': 'Quick Open',
     'goToLine': 'Go to Line',
     'executeLine': 'Execute Line in Terminal',
@@ -3935,7 +4171,7 @@
       { label: 'View: Toggle Explorer', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="explorer"]').classList.add('active'); $('#panel-explorer').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle Quick Actions', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="quick"]').classList.add('active'); $('#panel-quick').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle Search', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="search"]').classList.add('active'); $('#panel-search').classList.add('active'); setTimeout(() => $('#search-input')?.focus(), 50); }, category: 'View' },
-      { label: 'View: Toggle AI Assistant', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="ai"]').classList.add('active'); $('#panel-ai').classList.add('active'); if (aiInput) aiInput.focus(); }, category: 'View' },
+      { label: 'View: Toggle Copilot', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="ai"]').classList.add('active'); $('#panel-ai').classList.add('active'); if (aiInput) aiInput.focus(); }, category: 'View' },
       { label: 'View: Toggle Docker', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="docker"]').classList.add('active'); $('#panel-docker').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle API Client', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="apiclient"]').classList.add('active'); $('#panel-apiclient').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle Forms', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="forms"]').classList.add('active'); $('#panel-forms').classList.add('active'); nautRefreshForms(); }, category: 'View' },
@@ -3946,6 +4182,7 @@
       { label: 'View: Toggle Translations / i18n', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="i18n"]').classList.add('active'); $('#panel-i18n').classList.add('active'); nautRefreshI18n(); }, category: 'View' },
       { label: 'View: Toggle Admin Site', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="admin"]').classList.add('active'); $('#panel-admin').classList.add('active'); nautRefreshAdmin(); }, category: 'View' },
       { label: 'View: Toggle REST Framework', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="drf"]').classList.add('active'); $('#panel-drf').classList.add('active'); nautRefreshDrf(); }, category: 'View' },
+      { label: 'View: Toggle Reports', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="enterprise"]').classList.add('active'); $('#panel-enterprise').classList.add('active'); nautRefreshReport(); }, category: 'View' },
       { label: 'View: Zen Mode', action: toggleZenMode, category: 'View' },
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
@@ -3961,9 +4198,9 @@
       { label: 'Django: Check Project', action: () => runQuickAction('check'), category: 'Django' },
       { label: 'Django: Run Tests', action: () => runQuickAction('test'), category: 'Django' },
       { label: 'Django: Shell', action: () => runQuickAction('shell'), category: 'Django' },
-      { label: 'AI: Generate Tests', action: runAITests, category: 'AI' },
-      { label: 'AI: Run Bug Hunter', action: runBugHunter, category: 'AI' },
-      { label: 'AI: Lint Current File', action: lintCurrentFile, category: 'AI' },
+      { label: 'Quality: Generate Tests', action: runAITests, category: 'Quality' },
+      { label: 'Quality: Run Bug Hunter', action: runBugHunter, category: 'Quality' },
+      { label: 'Quality: Lint Current File', action: lintCurrentFile, category: 'Quality' },
       { label: 'Terminal: Clear', action: () => { const t = getActiveTerm(); if (t) t.clear(); }, category: 'Terminal' },
       { label: 'Terminal: Kill', action: () => { const t = getActiveTerm(); if (t) termSocketSend('kill', t._termId, {}); terminalActive = false; termPrint('Terminal killed.', 'line-info'); }, category: 'Terminal' },
       { label: 'Git: Status', action: updateGitStatus, category: 'Git' },
@@ -4323,7 +4560,7 @@
         addAiMessage('assistant', '🧠 **Error Interceptor:**\n\n' + r);
       } catch (e) {}
     } else {
-      addAiMessage('assistant', '⛔ **Runtime error:** ' + toastMsg + '\n\nSet a GROQ API key in Settings to get an AI-powered fix.');
+      addAiMessage('assistant', '⛔ **Runtime error:** ' + toastMsg + '\n\nSet a GROQ API key in Settings to get a suggested fix.');
     }
   }
 
@@ -5343,6 +5580,7 @@
     } catch (e) {
       res = { passed: 0, failed: 0, errors: 1, error: e.message, output: e.message };
     }
+    nautTestStats = { passed: res.passed || 0, failed: res.failed || 0, errors: res.errors || 0, skipped: res.skipped || 0, framework: res.framework };
     const failedIds = res.failedIds || [];
     for (const t of nautTests.list || []) {
       if (failedIds.includes(t.nodeId)) nautTestStatus[t.nodeId] = 'failed';
@@ -5546,6 +5784,7 @@
     nautRefreshDeps();
     nautRefreshSecurity();
     nautRefreshTests();
+    nautRefreshReport();
     nautResetProfiler();
     nautRefreshCache();
     nautRefreshDb();
@@ -7225,6 +7464,11 @@
   $('#btn-admin-refresh')?.addEventListener('click', nautRefreshAdmin);
   $('#drf-search')?.addEventListener('input', (e) => { _drfFilter = e.target.value; nautRenderDrf(); });
   $('#btn-drf-refresh')?.addEventListener('click', nautRefreshDrf);
+  $('#btn-report-refresh')?.addEventListener('click', nautRefreshReport);
+  $('#btn-report-generate')?.addEventListener('click', nautGenerateReport);
+  $('#btn-report-export')?.addEventListener('click', nautExportMarkdown);
+  $('#btn-report-pdf')?.addEventListener('click', nautExportPdf);
+  $('#btn-notes-save')?.addEventListener('click', nautSaveNotes);
   $('#db-alias')?.addEventListener('change', () => {
     _dbCurrentAlias = $('#db-alias')?.value || 'default';
     nautDbUpdateEngine();

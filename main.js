@@ -7,7 +7,8 @@ const https = require('node:https');
 const crypto = require('node:crypto');
 
 const { scanProject } = require('./django-scanner');
-const { runBugHunter } = require('./bughunter');
+const { runBugHunter, applyFix } = require('./bughunter');
+const reportGenerator = require('./report-generator');
 const { startTelemetryServer, getState } = require('./telemetry-server');
 const migrationGuard = require('./migration-guard');
 const { scanSignals, getSignalLenses, scanTasks } = require('./agent-scanners');
@@ -550,10 +551,16 @@ ipcMain.handle('django:scan', (_event, folder) => {
 });
 
 ipcMain.handle('django:bughunt', (_event, folder) => {
+  const t0 = Date.now();
   const scan = scanProject(folder);
   if (scan.error) return { scan, issues: [] };
   const issues = runBugHunter(scan);
-  return { scan, issues };
+  const fixable = issues.filter((i) => i.fixable).length;
+  return { scan, issues, counts: { total: issues.length, fixable }, scanMs: Date.now() - t0 };
+});
+
+ipcMain.handle('bug:applyFix', (_event, { issue }) => {
+  return applyFix(issue);
 });
 
 // ── GROQ AI ────────────────────────────────────────────────────────────────
@@ -1154,6 +1161,59 @@ ipcMain.handle('deps:scan', async (_e, root) => {
 
 ipcMain.handle('security:scan', (_e, root) => {
   return securityScanner.scanSecurity(root);
+});
+
+// ── Enterprise Audit Reports ───────────────────────────────────────────────
+
+ipcMain.handle('report:generate', async (_e, root) => {
+  const t0 = Date.now();
+  const scan = scanProject(root);
+  scan._scanMs = Date.now() - t0;
+  const issues = scan.error ? [] : runBugHunter(scan);
+  const security = scan.error
+    ? { findings: [], summary: { critical: 0, warning: 0, info: 0, total: 0 } }
+    : securityScanner.scanSecurity(root);
+  let depsRes = { file: null, packages: [] };
+  try { depsRes = await deps.scanDeps(root); } catch {}
+  const report = reportGenerator.computeReport({ scan, issues, security, deps: depsRes, testStats: null });
+  const markdown = reportGenerator.buildMarkdown(report, { root, issues, security, deps: depsRes });
+  return { report, scan, issues, security, deps: depsRes, markdown };
+});
+
+ipcMain.handle('dialog:saveFile', async (_e, opts) => {
+  const result = await dialog.showSaveDialog({
+    defaultPath: (opts && opts.defaultPath) || undefined,
+    filters: (opts && opts.filters) || [{ name: 'All Files', extensions: ['*'] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+  return result.filePath;
+});
+
+ipcMain.handle('report:save', async (_e, { path: filePath, content }) => {
+  await fs.promises.writeFile(filePath, content, 'utf8');
+  return { success: true };
+});
+
+ipcMain.handle('report:pdf', async (_e, { path: filePath, report, issues, security, deps, notes, root }) => {
+  const md = reportGenerator.buildMarkdown(report, { root, issues, security, deps, notes });
+  const html = reportGenerator.buildReportHtml(report, { root, issues, security, deps, notes });
+  return new Promise((resolve, reject) => {
+    const win = new BrowserWindow({ show: false, webPreferences: { sandbox: false } });
+    const done = (fn, arg) => { try { win.destroy(); } catch {} fn(arg); };
+    win.webContents.once('did-finish-load', async () => {
+      try {
+        const data = await win.webContents.printToPDF({ pageSize: 'A4', printBackground: true });
+        await fs.promises.writeFile(filePath, data);
+        done(resolve, { success: true });
+      } catch (err) {
+        done(reject, err);
+      }
+    });
+    win.webContents.on('did-fail-load', (_ev, code, desc) => {
+      done(reject, new Error('PDF render failed (' + code + '): ' + desc));
+    });
+    win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  });
 });
 
 ipcMain.handle('cache:inspect', async (_e, root) => {
