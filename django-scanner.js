@@ -85,6 +85,7 @@ function parseSettings(filePath) {
     databaseEngine: null,
     allowedHosts: null,
     staticFiles: null,
+    settingsFile: filePath,
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -92,7 +93,12 @@ function parseSettings(filePath) {
     if (line.startsWith('#')) continue;
 
     if (/^DEBUG\s*=/.test(line)) {
-      settings.debug = /True|true|1/.test(line.split('=')[1]);
+      if (/os\.environ|environ\.get|getenv|decouple|config\s*\(/.test(line)) {
+        settings.debug = null;
+      } else {
+        const val = line.slice(line.indexOf('=') + 1).trim();
+        settings.debug = /^(True|true|1)\b/.test(val);
+      }
     }
     if (/^SECRET_KEY\s*=/.test(line)) {
       const match = line.match(/SECRET_KEY\s*=\s*['"](.+?)['"]/);
@@ -148,7 +154,7 @@ function parseModels(filePath) {
           const fieldType = fieldMatch[2];
           const isForeignKey = fieldType === 'ForeignKey' || fieldType === 'OneToOneField';
           const relatedModel = isForeignKey ? (fLine.match(/to\s*=?\s*['"]?(\w+)['"]?/) || [])[1] : null;
-          fields.push({ name: fieldName, type: fieldType, relatedModel });
+          fields.push({ name: fieldName, type: fieldType, isForeignKey, relatedModel });
         }
       }
 
@@ -224,6 +230,21 @@ function parseUrls(filePath) {
 }
 
 
+function isModelsFile(file) {
+  const base = path.basename(file);
+  if (base === 'models.py') return true;
+  if (base === '__init__.py' || !base.endsWith('.py')) return false;
+  return path.basename(path.dirname(file)) === 'models';
+}
+
+function isViewsFile(file) {
+  const base = path.basename(file);
+  if (base === 'views.py' || base === 'viewsets.py' || base === 'api.py') return true;
+  const parent = path.basename(path.dirname(file));
+  return parent === 'views' || parent === 'api';
+}
+
+
 function scanProject(folder) {
   const djangoRoot = findDjangoRoot(folder);
   if (!djangoRoot) return { error: 'No Django project found (missing manage.py)' };
@@ -246,10 +267,10 @@ function scanProject(folder) {
     if (basename === 'settings.py') {
       result.settings = parseSettings(file);
     }
-    if (basename === 'models.py') {
+    if (isModelsFile(file)) {
       result.models.push(...parseModels(file));
     }
-    if (basename === 'views.py' || basename === 'viewsets.py') {
+    if (isViewsFile(file)) {
       result.views.push(...parseViews(file));
     }
     if (basename === 'serializers.py') {

@@ -12,12 +12,12 @@ function checkDebugMode(scan) {
   if (!scan.settings) return [];
   if (scan.settings.debug === true) {
     return [{
-      severity: 'error',
+      severity: 'warning',
       category: 'Security',
-      title: 'DEBUG = True in production',
-      message: 'DEBUG mode is enabled. This exposes detailed error pages and should never be used in production.',
+      title: 'DEBUG = True',
+      message: 'DEBUG mode is enabled. It exposes detailed error pages. Verify this is intended for local/dev use only — it must be off in production.',
       file: path.join(scan.root, 'settings.py'),
-      fix: 'Set DEBUG = False in settings.py for production.',
+      fix: 'Drive it from env, e.g. DEBUG = os.environ.get("DEBUG", "False") == "True", and keep it False in production.',
     }];
   }
   return [];
@@ -28,9 +28,12 @@ function checkDebugMode(scan) {
 function checkSecretKey(scan) {
   if (!scan.settings) return [];
   const issues = [];
+  const settingsFile = scan.settings.settingsFile || path.join(scan.root, 'settings.py');
+  const content = readFileSafe(settingsFile) || '';
+  const envBased = /SECRET_KEY\s*=.*(?:os\.environ|environ\.get|getenv|python-decouple|config\s*\()/.test(content);
   const key = scan.settings.secretKey;
 
-  if (!key) {
+  if (!key && !envBased) {
     issues.push({
       severity: 'warning',
       category: 'Security',
@@ -39,7 +42,7 @@ function checkSecretKey(scan) {
       file: path.join(scan.root, 'settings.py'),
       fix: 'Ensure SECRET_KEY is defined in settings.py.',
     });
-  } else if (key.length < 20) {
+  } else if (key && key.length < 20) {
     issues.push({
       severity: 'error',
       category: 'Security',
@@ -48,7 +51,7 @@ function checkSecretKey(scan) {
       file: path.join(scan.root, 'settings.py'),
       fix: 'Generate a strong SECRET_KEY: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"',
     });
-  } else if (/^(abc|123|password|secret|django)/i.test(key)) {
+  } else if (key && /^(abc|123|password|secret|django)/i.test(key)) {
     issues.push({
       severity: 'error',
       category: 'Security',
@@ -59,15 +62,16 @@ function checkSecretKey(scan) {
     });
   }
 
-  // Check if hardcoded in settings (not using env)
-  issues.push({
-    severity: 'warning',
-    category: 'Security',
-    title: 'SECRET_KEY hardcoded in settings.py',
-    message: 'SECRET_KEY is hardcoded. Consider using environment variables.',
-    file: path.join(scan.root, 'settings.py'),
-    fix: 'Use os.environ.get("SECRET_KEY") or python-decouple.',
-  });
+  if (key && !envBased) {
+    issues.push({
+      severity: 'warning',
+      category: 'Security',
+      title: 'SECRET_KEY hardcoded in settings.py',
+      message: 'SECRET_KEY is hardcoded. Consider using environment variables.',
+      file: path.join(scan.root, 'settings.py'),
+      fix: 'Use os.environ.get("SECRET_KEY") or python-decouple.',
+    });
+  }
 
   return issues;
 }
@@ -82,48 +86,48 @@ function checkNPlusOne(scan) {
     if (!content) continue;
 
     const lines = content.split('\n');
-    const inLoop = [];
-    let loopDepth = 0;
+    const loops = [];
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+      const raw = lines[i];
+      const trimmed = raw.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
 
-      if (/^\s*(for|while)\s+/.test(lines[i])) {
-        loopDepth++;
-        inLoop.push(i + 1);
-      }
-      if (loopDepth > 0 && (line === '}' || line === '' && lines[i].trimEnd() === '')) {
-        loopDepth = Math.max(0, loopDepth - 1);
-        if (loopDepth === 0) inLoop.pop();
+      const indent = raw.length - raw.trimStart().length;
+      while (loops.length && indent <= loops[loops.length - 1].indent) loops.pop();
+
+      if (/^\s*(for|while)\b.*:\s*$/.test(raw)) {
+        loops.push({ indent, line: i + 1 });
       }
 
-      // Check for attribute access on objects that might be ForeignKey
-      if (loopDepth > 0) {
-        const fkAccess = line.match(/\.(\w+)\s/);
-        if (fkAccess && scan.models.some(m => m.fields.some(f => f.isForeignKey && f.name === fkAccess[1]))) {
+      if (!loops.length) continue;
+
+      const fkAccess = trimmed.match(/\.(\w+)(?![\(\w])/);
+      if (fkAccess) {
+        const name = fkAccess[1];
+        if (scan.models.some((m) => m.fields.some((f) => f.isForeignKey && f.name === name))) {
           issues.push({
             severity: 'performance',
             category: 'N+1 Query',
-            title: `Potential N+1 on "${fkAccess[1]}" access`,
-            message: `Accessing .${fkAccess[1]} inside a loop at line ${i + 1}. This triggers a separate query per iteration.`,
+            title: `Potential N+1 on "${name}" access`,
+            message: `Accessing .${name} inside a loop at line ${i + 1}. This triggers a separate query per iteration.`,
             file: view.filePath,
             line: i + 1,
-            fix: `Use select_related('${fkAccess[1]}') or prefetch_related('${fkAccess[1]}').`,
+            fix: `Use select_related('${name}') or prefetch_related('${name}').`,
           });
         }
+      }
 
-        // Check for .objects.all() or .filter() inside loops
-        if (/\.objects\.(all|filter|exclude)\(/.test(line) && inLoop.length > 0) {
-          issues.push({
-            severity: 'performance',
-            category: 'N+1 Query',
-            title: 'Query inside a loop',
-            message: `Database query at line ${i + 1} is inside a loop. This causes N+1 queries.`,
-            file: view.filePath,
-            line: i + 1,
-            fix: 'Move the query outside the loop or use prefetch_related.',
-          });
-        }
+      if (/\.objects\.(all|filter|exclude|get|first)\(/.test(trimmed)) {
+        issues.push({
+          severity: 'performance',
+          category: 'N+1 Query',
+          title: 'Query inside a loop',
+          message: `Database query at line ${i + 1} is inside a loop. This causes N+1 queries.`,
+          file: view.filePath,
+          line: i + 1,
+          fix: 'Move the query outside the loop or use prefetch_related.',
+        });
       }
     }
   }
@@ -132,31 +136,9 @@ function checkNPlusOne(scan) {
 }
 
 // ── Check: Missing indexes on ForeignKey ──────────────────────────────────
-
-function checkMissingIndexes(scan) {
-  const issues = [];
-
-  for (const model of scan.models) {
-    for (const field of model.fields) {
-      if (field.type === 'ForeignKey' || field.type === 'OneToOneField') {
-        const content = readFileSafe(model.filePath);
-        if (content && !content.includes('db_index=True') && !content.includes('related_name=')) {
-          issues.push({
-            severity: 'performance',
-            category: 'Missing Index',
-            title: `ForeignKey "${field.name}" may need an index`,
-            message: `${model.name}.${field.name} is a ${field.type} without explicit db_index=True. Queries filtering on this field may be slow.`,
-            file: model.filePath,
-            line: model.line,
-            fix: `Add db_index=True to ${field.name} = models.ForeignKey(..., db_index=True)`,
-          });
-        }
-      }
-    }
-  }
-
-  return issues;
-}
+// Note: Django automatically creates a database index for ForeignKey and
+// OneToOneField columns. Flagging every FK for db_index=True was a false
+// positive — the column is already indexed. Removed for correctness.
 
 // ── Check: Missing on_delete ──────────────────────────────────────────────
 
@@ -253,7 +235,8 @@ function checkMissingTests(scan) {
 function checkAllowedHosts(scan) {
   if (!scan.settings) return [];
 
-  const content = readFileSafe(path.join(scan.root, 'settings.py'));
+  const settingsFile = scan.settings.settingsFile || path.join(scan.root, 'settings.py');
+  const content = readFileSafe(settingsFile);
   if (!content) return [];
 
   if (/ALLOWED_HOSTS\s*=\s*\[\s*\]/.test(content)) {
@@ -285,39 +268,53 @@ function checkAllowedHosts(scan) {
 
 function checkUnusedImports(scan) {
   const issues = [];
+  const COMMON = new Set(['os', 'sys']);
 
   for (const file of scan.files) {
+    if (path.basename(file) === '__init__.py') continue;
     const content = readFileSafe(file);
     if (!content) continue;
 
     const lines = content.split('\n');
-    const imports = [];
+    const body = lines.filter((l) => !/^\s*(import|from)\s/.test(l)).join('\n');
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (line.startsWith('import ') || line.startsWith('from ')) {
-        const match = line.match(/(?:import|from)\s+(\w+)/);
-        if (match) {
-          imports.push({ name: match[1], line: i + 1, full: line });
+      if (!/^(import|from)\s/.test(line)) continue;
+
+      const symbols = [];
+      const asMatch = line.match(/^import\s+(\w+)\s+as\s+(\w+)$/);
+      if (asMatch) {
+        symbols.push(asMatch[2]);
+      } else if (/^import\s/.test(line)) {
+        const names = line.replace(/^import\s+/, '').split(',');
+        for (const n of names) {
+          const name = n.trim().split(/\s+as\s+/)[0].split('.')[0];
+          if (name) symbols.push(name);
+        }
+      } else {
+        const m = line.match(/^from\s+[\w.]+\s+import\s+(.+)$/);
+        if (!m) continue;
+        const items = m[1].split(',');
+        for (const it of items) {
+          const sym = it.trim().split(/\s+as\s+/)[0].split('.')[0];
+          if (sym && sym !== '*' && sym !== '(') symbols.push(sym);
         }
       }
-    }
 
-    const rest = content.replace(/^(?:import|from)\s+.+$/gm, '');
-
-    for (const imp of imports) {
-      if (imp.name === 'os' || imp.name === 'sys' || imp.name === 'django') continue;
-      const regex = new RegExp('\\b' + imp.name + '\\b');
-      if (!regex.test(rest)) {
-        issues.push({
-          severity: 'info',
-          category: 'Code Quality',
-          title: `Unused import: "${imp.name}"`,
-          message: `"${imp.name}" is imported but never used in ${path.relative(scan.root, file)}.`,
-          file,
-          line: imp.line,
-          fix: `Remove: ${imp.full}`,
-        });
+      for (const sym of symbols) {
+        if (COMMON.has(sym)) continue;
+        if (!new RegExp('\\b' + escRe(sym) + '\\b').test(body)) {
+          issues.push({
+            severity: 'info',
+            category: 'Code Quality',
+            title: `Unused import: "${sym}"`,
+            message: `"${sym}" is imported but never used in ${path.relative(scan.root, file)} (line ${i + 1}).`,
+            file,
+            line: i + 1,
+            fix: `Remove: ${line}`,
+          });
+        }
       }
     }
   }
@@ -355,7 +352,6 @@ function checkLargeFiles(scan) {
 function isAutoFixable(issue) {
   if (!issue || !issue.fix || !issue.file) return false;
   if (/^Missing on_delete/.test(issue.title)) return true;
-  if (/may need an index/.test(issue.title)) return true;
   if (/^Unused import/.test(issue.title)) return true;
   return false;
 }
@@ -392,24 +388,6 @@ function applyFix(issue) {
     content = content.slice(0, lineStart) + fixed + content.slice(lineEnd === -1 ? content.length : lineEnd);
   }
 
-  // ── Missing index ────────────────────────────────────────────────────
-  else if (/may need an index/.test(issue.title)) {
-    const m = issue.title.match(/"([^"]+)"/);
-    const field = m ? m[1] : null;
-    if (!field) return { applied: false, reason: 'field name not in title' };
-    const re = new RegExp('^\\s*' + escRe(field) + '\\s*=\\s*models\\.(ForeignKey|OneToOneField)\\s*\\(', 'm');
-    const match = content.match(re);
-    if (!match) return { applied: false, reason: 'field definition not found' };
-    const lineStart = content.indexOf(match[0]);
-    const lineEnd = content.indexOf('\n', lineStart);
-    const fullLine = content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd);
-    if (fullLine.includes('db_index')) return { applied: false, reason: 'already indexed' };
-    const trimmed = fullLine.trim();
-    if (!/\)\s*$/.test(trimmed) || /,\s*$/.test(trimmed)) return { applied: false, reason: 'multi-line definition, skipping' };
-    const fixed = fullLine.replace(/\)\s*$/, ', db_index=True)');
-    content = content.slice(0, lineStart) + fixed + content.slice(lineEnd === -1 ? content.length : lineEnd);
-  }
-
   // ── Unused import ────────────────────────────────────────────────────
   else if (/^Unused import/.test(issue.title)) {
     const m = issue.fix.match(/Remove:\s*(.+)/);
@@ -438,7 +416,6 @@ function runBugHunter(scan) {
     checkHardcodedSecrets,
     checkAllowedHosts,
     checkNPlusOne,
-    checkMissingIndexes,
     checkMissingOnDelete,
     checkMissingTests,
     checkUnusedImports,
