@@ -16,12 +16,22 @@
     "type": "git",
     "url": "https://github.com/Mardon-programm/Django_NAUT.git"
   },
+  "files": [
+    "bin/",
+    "cli.js",
+    "django-scanner.js",
+    "bughunter.js",
+    "security-scanner.js",
+    "deps-updater.js",
+    "report-generator.js"
+  ],
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node tests/run-all.js",
     "test:smoke": "node tests/electron-smoke.test.js",
     "audit": "node bin/djangonaut.js audit",
+    "prepublishOnly": "npm test",
     "build": "electron-builder --win -p never",
     "build:mac": "electron-builder --mac -p never",
     "build:linux": "electron-builder --linux -p never",

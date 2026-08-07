@@ -59,7 +59,12 @@ function usage() {
 
 function parseArgs(argv) {
   const args = { folder: '.', json: false, failOn: 'error', minSeverity: 'info', deps: true, output: null, markdown: null, help: false, version: false };
-  for (const raw of argv) {
+  const valueOpts = ['fail-on', 'min-severity', 'output', 'markdown'];
+  const optMap = { 'fail-on': 'failOn', 'min-severity': 'minSeverity', 'output': 'output', 'markdown': 'markdown' };
+  const setOpt = (key, val) => { args[optMap[key]] = val; };
+  const argvL = argv.length;
+  for (let i = 0; i < argvL; i++) {
+    const raw = argv[i];
     if (raw === '--json') { args.json = true; continue; }
     if (raw === '--no-deps') { args.deps = false; continue; }
     if (raw === '--help' || raw === '-h') { args.help = true; continue; }
@@ -67,12 +72,18 @@ function parseArgs(argv) {
     const eq = raw.indexOf('=');
     if (raw.startsWith('--') && eq !== -1) {
       const key = raw.slice(2, eq);
-      const val = raw.slice(eq + 1);
-      if (key === 'fail-on') args.failOn = val;
-      else if (key === 'min-severity') args.minSeverity = val;
-      else if (key === 'output') args.output = val;
-      else if (key === 'markdown') args.markdown = val;
-      else return { error: 'Unknown option: ' + raw };
+      if (!valueOpts.includes(key)) return { error: 'Unknown option: ' + raw };
+      setOpt(key, raw.slice(eq + 1));
+      continue;
+    }
+    const dash = raw.match(/^--([a-z-]+)$/);
+    if (raw.startsWith('--') && dash) {
+      const key = dash[1];
+      if (!valueOpts.includes(key)) return { error: 'Unknown option: ' + raw };
+      const next = argv[i + 1];
+      if (next === undefined || (next.startsWith('-') && next !== '-')) return { error: 'Missing value for ' + raw };
+      setOpt(key, next);
+      i++;
       continue;
     }
     if (raw.startsWith('-') && raw !== '-') return { error: 'Unknown option: ' + raw };

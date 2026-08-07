@@ -32,6 +32,11 @@ test('parseArgs defaults and flags', () => {
   const a = parseArgs(['audit', 'src', '--json', '--fail-on=warning', '--no-deps']);
   ok(a.folder === 'src' && a.json && a.failOn === 'warning' && a.deps === false, 'flags not parsed');
   ok(parseArgs(['--fail-on=banana']).error, 'invalid fail-on not rejected');
+  const b = parseArgs(['--fail-on', 'warning', '--min-severity', 'error', '--output', 'x.json', '--markdown', 'x.md']);
+  ok(b.failOn === 'warning' && b.minSeverity === 'error' && b.output === 'x.json' && b.markdown === 'x.md', 'space-form values not parsed');
+  ok(parseArgs(['--output']).error, 'missing value not rejected');
+  ok(parseArgs(['--fail-on', '--json']).error, 'value-looking-like-flag not rejected');
+  ok(parseArgs(['--bogus']).error, 'unknown option not rejected');
 });
 
 test('clean project exits 0, dirty project exits 1 (fail-on error)', async () => {
