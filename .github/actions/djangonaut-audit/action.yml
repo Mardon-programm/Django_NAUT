@@ -1,0 +1,100 @@
+name: DjangoNAUT Audit
+description: >-
+  Static audit of a Django project: health score, security findings, N+1 and
+  dependency risks. Produces a JSON + Markdown report and fails the build when
+  findings are at/above a severity threshold. Exit codes: 0 passed, 1 findings,
+  2 fatal error.
+author: DjangoNAUT
+
+inputs:
+  project-path:
+    description: >-
+      Path to the Django project (a folder containing manage.py) relative to the
+      workspace root.
+    required: false
+    default: .
+  fail-on:
+    description: >-
+      Fail the build if a finding is at or above this severity.
+      One of: critical, error (default), warning, performance, info, none.
+    required: false
+    default: error
+  min-severity:
+    description: "Only report findings at or above this level. Default: info."
+    required: false
+    default: info
+  no-deps:
+    description: Set to true to skip the network dependency (PyPI/OSV) scan.
+    required: false
+    default: "false"
+  node-version:
+    description: Node.js version used to run the CLI.
+    required: false
+    default: "20"
+  json-report:
+    description: Relative path where the JSON audit report is written.
+    required: false
+    default: djangonaut-audit.json
+  markdown-report:
+    description: Relative path where the Markdown audit report is written.
+    required: false
+    default: djangonaut-audit.md
+  cli-source:
+    description: >-
+      Optional local path (relative to the workspace) of a DjangoNAUT source
+      checkout containing bin/djangonaut.js. When set, the CLI is run from there
+      instead of installing from npm. Useful for testing the action in CI.
+
+outputs:
+  exit-code:
+    description: >-
+      Audit exit code. 0 = passed, 1 = findings at/above threshold, 2 = fatal.
+    value: ${{ steps.audit.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Prepare DjangoNAUT CLI
+      id: prepare
+      shell: bash
+      env:
+        CLI_SOURCE: ${{ inputs.cli-source }}
+      run: |
+        if [ -n "$CLI_SOURCE" ]; then
+          echo "cli=$GITHUB_WORKSPACE/$CLI_SOURCE/bin/djangonaut.js" >> "$GITHUB_ENV"
+        elif command -v djangonaut >/dev/null 2>&1; then
+          echo "cli=djangonaut" >> "$GITHUB_ENV"
+        else
+          npm install -g djangonaut@latest
+          echo "cli=djangonaut" >> "$GITHUB_ENV"
+        fi
+
+    - name: Run DjangoNAUT audit
+      id: audit
+      shell: bash
+      env:
+        NO_COLOR: "1"
+        INPUT_PROJECT_PATH: ${{ inputs.project-path }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_MIN_SEVERITY: ${{ inputs.min-severity }}
+        INPUT_NO_DEPS: ${{ inputs.no-deps }}
+        INPUT_JSON_REPORT: ${{ inputs.json-report }}
+        INPUT_MARKDOWN_REPORT: ${{ inputs.markdown-report }}
+      run: |
+        DEP_FLAG=""
+        if [ "$INPUT_NO_DEPS" = "true" ]; then DEP_FLAG="--no-deps"; fi
+        set +e
+        "$cli" audit "$GITHUB_WORKSPACE/$INPUT_PROJECT_PATH" \
+          --fail-on "$INPUT_FAIL_ON" \
+          --min-severity "$INPUT_MIN_SEVERITY" \
+          --output "$GITHUB_WORKSPACE/$INPUT_JSON_REPORT" \
+          --markdown "$GITHUB_WORKSPACE/$INPUT_MARKDOWN_REPORT" \
+          $DEP_FLAG
+        code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit $code

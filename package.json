@@ -3,6 +3,9 @@
   "version": "1.0.5",
   "description": "Полноценная IDE для Django с терминалом, AI-ассистентом и деплоем",
   "main": "main.js",
+  "bin": {
+    "djangonaut": "bin/djangonaut.js"
+  },
   "author": {
     "name": "DjangoNAUT",
     "email": "mardon@users.noreply.github.com"
@@ -18,6 +21,7 @@
     "dev": "electron . --dev",
     "test": "node tests/run-all.js",
     "test:smoke": "node tests/electron-smoke.test.js",
+    "audit": "node bin/djangonaut.js audit",
     "build": "electron-builder --win -p never",
     "build:mac": "electron-builder --mac -p never",
     "build:linux": "electron-builder --linux -p never",

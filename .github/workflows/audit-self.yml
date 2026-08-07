@@ -1,0 +1,54 @@
+name: DjangoNAUT Self-Audit
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  cli:
+    name: CLI audit (from source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Audit must pass with --fail-on none (exit 0)
+        run: node bin/djangonaut.js audit web_editor --no-deps --fail-on none
+      - name: Strict audit must fail on errors (exit 1) and emit JSON
+        run: |
+          set +e
+          node bin/djangonaut.js audit web_editor --no-deps --json > djangonaut-audit.json
+          code=$?
+          test "$code" = "1"
+      - name: Upload JSON report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-audit-json
+          path: djangonaut-audit.json
+
+  action:
+    name: Composite action smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run composite action (local source)
+        id: audit
+        uses: ./.github/actions/djangonaut-audit
+        with:
+          project-path: web_editor
+          cli-source: .
+          no-deps: "true"
+          fail-on: none
+      - name: Verify audit passed
+        run: test "${{ steps.audit.outputs.exit-code }}" = "0"
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: action-audit-reports
+          path: |
+            djangonaut-audit.json
+            djangonaut-audit.md

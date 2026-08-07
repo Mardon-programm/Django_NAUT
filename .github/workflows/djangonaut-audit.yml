@@ -1,0 +1,82 @@
+name: DjangoNAUT Audit
+on:
+  workflow_call:
+    inputs:
+      project-path:
+        description: >-
+          Path to the Django project (a folder containing manage.py) relative to
+          the repository root.
+        type: string
+        required: false
+        default: .
+      fail-on:
+        description: >-
+          Fail the build if a finding is at or above this severity.
+          critical | error | warning | performance | info | none
+        type: string
+        required: false
+        default: error
+      min-severity:
+        description: Only report findings at or above this level.
+        type: string
+        required: false
+        default: info
+      no-deps:
+        description: Skip the network dependency (PyPI/OSV) scan.
+        type: boolean
+        required: false
+        default: false
+      node-version:
+        description: Node.js version used to run the CLI.
+        type: string
+        required: false
+        default: "20"
+      json-report:
+        description: Relative path where the JSON audit report is written.
+        type: string
+        required: false
+        default: djangonaut-audit.json
+      markdown-report:
+        description: Relative path where the Markdown audit report is written.
+        type: string
+        required: false
+        default: djangonaut-audit.md
+    outputs:
+      exit-code:
+        description: >-
+          Audit exit code. 0 = passed, 1 = findings at/above threshold, 2 = fatal.
+        value: ${{ jobs.audit.outputs.exit-code }}
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: DjangoNAUT Audit
+    runs-on: ubuntu-latest
+    outputs:
+      exit-code: ${{ steps.audit.outputs.exit-code }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run DjangoNAUT audit
+        id: audit
+        uses: Mardon-programm/Django_NAUT/.github/actions/djangonaut-audit@main
+        with:
+          project-path: ${{ inputs.project-path }}
+          fail-on: ${{ inputs.fail-on }}
+          min-severity: ${{ inputs.min-severity }}
+          no-deps: ${{ inputs.no-deps }}
+          node-version: ${{ inputs.node-version }}
+          json-report: ${{ inputs.json-report }}
+          markdown-report: ${{ inputs.markdown-report }}
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: djangonaut-audit
+          path: |
+            ${{ inputs.json-report }}
+            ${{ inputs.markdown-report }}
+          if-no-files-found: warn

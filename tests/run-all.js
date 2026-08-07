@@ -9,6 +9,7 @@ require('./python-agent.test.js');
 require('./package-files.test.js');
 require('./wiring.test.js');
 require('./bughunter.test.js');
+require('./cli.test.js');
 
 const fail = run();
 console.log('suite time: ' + (Date.now() - t0) + 'ms');
