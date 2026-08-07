@@ -34,15 +34,43 @@ function walkDir(dir) {
 
 
 function findDjangoRoot(folder) {
+  if (!fs.existsSync(folder)) return null;
   if (fs.existsSync(path.join(folder, 'manage.py'))) return folder;
 
-  for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
-    if (entry.isDirectory() && !IGNORE.has(entry.name)) {
-      const sub = path.join(folder, entry.name);
+  const walk = (dir, depth) => {
+    if (depth > 3) return null;
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || IGNORE.has(entry.name)) continue;
+      const sub = path.join(dir, entry.name);
       if (fs.existsSync(path.join(sub, 'manage.py'))) return sub;
+      const deeper = walk(sub, depth + 1);
+      if (deeper) return deeper;
     }
-  }
-  return null;
+    return null;
+  };
+  const manageRoot = walk(folder, 1);
+  if (manageRoot) return manageRoot;
+
+  const walkSettings = (dir, depth) => {
+    if (depth > 2) return null;
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || IGNORE.has(entry.name)) continue;
+      const sub = path.join(dir, entry.name);
+      const settingsPath = path.join(sub, 'settings.py');
+      if (fs.existsSync(settingsPath)) {
+        const content = readFileSafe(settingsPath) || '';
+        if (/django|BASE_DIR|INSTALLED_APPS|SECRET_KEY/.test(content)) return sub;
+      }
+      const deeper = walkSettings(sub, depth + 1);
+      if (deeper) return deeper;
+    }
+    return null;
+  };
+  return walkSettings(folder, 1);
 }
 
 function parseSettings(filePath) {

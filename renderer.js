@@ -1665,6 +1665,103 @@
     if (term) termSocketSend('input', term._termId, cmd + '\r\n');
   }
 
+  // ── Quick Actions ──────────────────────────────────────────────────────
+
+  const QUICK_CMDS = {
+    runserver: { args: 'runserver', interactive: true },
+    runserver8001: { args: 'runserver 8001', interactive: true },
+    makemigrations: { args: 'makemigrations' },
+    migrate: { args: 'migrate' },
+    migrateall: { args: 'makemigrations && migrate' },
+    flush: { args: 'flush --noinput' },
+    createsuperuser: { args: 'createsuperuser', interactive: true },
+    shell: { args: 'shell', interactive: true },
+    check: { args: 'check' },
+    collectstatic: { args: 'collectstatic --noinput' },
+    test: { args: 'test --noinput' },
+  };
+
+  function qaRoot() {
+    return (scanData && !scanData.error && scanData.root) || currentFolder || '';
+  }
+
+  function qaCdPrefix() {
+    const root = qaRoot();
+    if (!root) return '';
+    if (shellType === 'powershell') return 'cd "' + root + '"; ';
+    if (shellType === 'bash') return 'cd "' + root + '" && ';
+    return 'cd /d "' + root + '" && ';
+  }
+
+  function updateQuickActions() {
+    const label = $('#qa-root-label');
+    if (!label) return;
+    const root = qaRoot();
+    label.textContent = root || 'No project open';
+    label.title = root;
+    label.classList.toggle('qa-root-empty', !root);
+    label.classList.toggle('qa-root-ok', !!(scanData && !scanData.error));
+  }
+
+  async function runQuickAction(action) {
+    const spec = QUICK_CMDS[action];
+    if (!spec) return;
+    if (!currentFolder) {
+      showToast('Open a Django project folder first.', 'warning');
+      return;
+    }
+    const root = qaRoot();
+    if (!root) {
+      showToast('Django root not detected in this folder.', 'warning');
+      return;
+    }
+    if (spec.interactive) {
+      executeCommand(qaCdPrefix() + 'python manage.py ' + spec.args);
+      showToast('Running: python manage.py ' + spec.args, 'success');
+      return;
+    }
+    const cmds = String(spec.args).split(' && ');
+    for (const c of cmds) {
+      const command = 'python manage.py ' + c;
+      outputPrint('Django: ' + command, 'out-info');
+      await window.api.django.cmd({ command, cwd: root });
+    }
+    if (action === 'makemigrations' || action === 'migrate' || action === 'migrateall') {
+      nautRefreshMigrations();
+    }
+  }
+
+  async function nautRefreshQuickScan() {
+    if (!currentFolder) {
+      showToast('Open a folder first.', 'warning');
+      return;
+    }
+    const scan = await window.api.django.scan(currentFolder);
+    scanData = scan.error ? null : scan;
+    const djangoTreeEl = $('#django-tree');
+    if (!scan.error) {
+      if (djangoTreeEl) {
+        buildDjangoTree(scan);
+        buildDjangoManagementButtons();
+      }
+      showToast('Project rescan OK.', 'success');
+    } else if (djangoTreeEl) {
+      djangoTreeEl.innerHTML = `<div class="django-empty"><p>${escapeHtml(scan.error)}</p></div>`;
+      showToast('Django project not detected.', 'warning');
+    }
+    updateQuickActions();
+  }
+
+  const qaListEl = $('#qa-list');
+  if (qaListEl) {
+    qaListEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.qa-btn');
+      if (!btn) return;
+      runQuickAction(btn.dataset.action);
+    });
+  }
+  $('#btn-qa-refresh')?.addEventListener('click', nautRefreshQuickScan);
+
   const bottomPanel = $('#bottom-panel');
   if (bottomPanel) {
     bottomPanel.addEventListener('click', (e) => {
@@ -2232,11 +2329,25 @@
     outputPrint('Folder opened: ' + folder, 'out-info');
 
     const scan = await window.api.django.scan(folder);
+    scanData = scan.error ? null : scan;
     if (!scan.error) {
-      scanData = scan;
       buildDjangoTree(scan);
       $('#status-django').innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/></svg> Django`;
       buildDjangoManagementButtons();
+    } else {
+      const djangoTreeEl = $('#django-tree');
+      if (djangoTreeEl) {
+        djangoTreeEl.innerHTML = `
+          <div class="django-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="1.5" opacity="0.8">
+              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>
+              <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p>${escapeHtml(scan.error)}</p>
+            <p style="font-size:10px;color:var(--text-dim)">Open the folder that contains <b>manage.py</b> (or a <b>settings.py</b>).</p>
+          </div>`;
+      }
+      showToast('Django project not detected in this folder.', 'warning');
     }
     nautAfterFolderOpen();
   }
@@ -3763,6 +3874,14 @@
       if (matchHotkey(e, hotkeys.lintFile)) { e.preventDefault(); e.stopPropagation(); lintCurrentFile(); return; }
       if (matchHotkey(e, hotkeys.quickOpen)) { e.preventDefault(); e.stopPropagation(); showQuickOpen(); return; }
       if (matchHotkey(e, hotkeys.goToLine)) { e.preventDefault(); e.stopPropagation(); showGoToLine(); return; }
+      if (e.ctrlKey && e.shiftKey && e.key === 'Q') {
+        e.preventDefault(); e.stopPropagation();
+        $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active'));
+        $$('.sidebar-panel').forEach((p) => p.classList.remove('active'));
+        $('[data-panel="quick"]').classList.add('active');
+        $('#panel-quick').classList.add('active');
+        return;
+      }
       if (e.ctrlKey && e.shiftKey && e.key === 'P') { e.preventDefault(); e.stopPropagation(); showCommandPalette(); return; }
       if (e.ctrlKey && e.key === 'l') { e.preventDefault(); e.stopPropagation(); const t = getActiveTerm(); if (t) t.clear(); return; }
       if (matchHotkey(e, hotkeys.executeLine)) {
@@ -3814,6 +3933,7 @@
       { label: 'File: Rename', action: () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2' })); }, category: 'File' },
       { label: 'View: Toggle Terminal', action: () => ensureTerminal().then(() => { const t = getActiveTerm(); if (t) t.focus(); }), category: 'View' },
       { label: 'View: Toggle Explorer', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="explorer"]').classList.add('active'); $('#panel-explorer').classList.add('active'); }, category: 'View' },
+      { label: 'View: Toggle Quick Actions', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="quick"]').classList.add('active'); $('#panel-quick').classList.add('active'); }, category: 'View' },
       { label: 'View: Toggle Search', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="search"]').classList.add('active'); $('#panel-search').classList.add('active'); setTimeout(() => $('#search-input')?.focus(), 50); }, category: 'View' },
       { label: 'View: Toggle AI Assistant', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="ai"]').classList.add('active'); $('#panel-ai').classList.add('active'); if (aiInput) aiInput.focus(); }, category: 'View' },
       { label: 'View: Toggle Docker', action: () => { $$('.activity-icon[data-panel]').forEach((b) => b.classList.remove('active')); $$('.sidebar-panel').forEach((p) => p.classList.remove('active')); $('[data-panel="docker"]').classList.add('active'); $('#panel-docker').classList.add('active'); }, category: 'View' },
@@ -3830,12 +3950,17 @@
       { label: 'View: Quick Open (Ctrl+P)', action: showQuickOpen, category: 'View' },
       { label: 'View: Go to Line (Ctrl+G)', action: showGoToLine, category: 'View' },
       { label: 'Django: New Project', action: createProject, category: 'Django' },
-      { label: 'Django: Run Server', action: () => runDjangoCmd('runserver'), category: 'Django' },
+      { label: 'Django: Run Server', action: () => runQuickAction('runserver'), category: 'Django' },
       { label: 'Django: Stop Server', action: () => { const t = getActiveTerm(); if (t && t._processActive) { termSocketSend('input', t._termId, '\x03'); showToast('Sent Ctrl+C.', 'success'); } }, category: 'Django' },
       { label: 'Django: Migrate', action: () => runDjangoCmd('migrate'), category: 'Django' },
       { label: 'Django: Makemigrations', action: () => runDjangoCmd('makemigrations'), category: 'Django' },
       { label: 'Django: Createsuperuser', action: () => runDjangoCmd('createsuperuser'), category: 'Django' },
       { label: 'Django: Collectstatic', action: () => runDjangoCmd('collectstatic'), category: 'Django' },
+      { label: 'Django: Make + Apply All', action: () => runQuickAction('migrateall'), category: 'Django' },
+      { label: 'Django: Flush DB', action: () => runQuickAction('flush'), category: 'Django' },
+      { label: 'Django: Check Project', action: () => runQuickAction('check'), category: 'Django' },
+      { label: 'Django: Run Tests', action: () => runQuickAction('test'), category: 'Django' },
+      { label: 'Django: Shell', action: () => runQuickAction('shell'), category: 'Django' },
       { label: 'AI: Generate Tests', action: runAITests, category: 'AI' },
       { label: 'AI: Run Bug Hunter', action: runBugHunter, category: 'AI' },
       { label: 'AI: Lint Current File', action: lintCurrentFile, category: 'AI' },
@@ -5407,6 +5532,7 @@
 
   async function nautAfterFolderOpen() {
     if (!currentFolder) return;
+    updateQuickActions();
     try {
       const st = await window.api.telemetry.getState();
       nautTelemetryPort = st.port || 0;

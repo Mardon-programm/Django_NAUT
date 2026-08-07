@@ -24,6 +24,11 @@
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
         </button>
+        <button class="activity-icon" data-panel="quick" title="Quick Actions (Ctrl+Shift+Q)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </button>
         <button class="activity-icon" data-panel="django" title="Django">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>
@@ -256,6 +261,71 @@
           <div class="sidebar-section-header" id="folder-name">No folder open</div>
         </div>
         <div class="sidebar-body" id="file-tree"></div>
+      </div>
+
+      <!-- Quick Actions Panel -->
+      <div class="sidebar-panel" id="panel-quick">
+        <div class="sidebar-header">
+          <span>QUICK ACTIONS</span>
+          <div class="sidebar-header-actions">
+            <button id="btn-qa-refresh" title="Rescan project">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="qa-root" id="qa-root-label">No project open</div>
+        <div class="sidebar-body" id="qa-list">
+          <div class="qa-section">RUN</div>
+          <button class="qa-btn" data-action="runserver" title="python manage.py runserver">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Run project
+          </button>
+          <button class="qa-btn" data-action="runserver8001" title="python manage.py runserver 8001">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Run on port 8001
+          </button>
+          <div class="qa-section">DATABASE</div>
+          <button class="qa-btn" data-action="makemigrations" title="python manage.py makemigrations">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Make migrations
+          </button>
+          <button class="qa-btn" data-action="migrate" title="python manage.py migrate">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            Apply migrations
+          </button>
+          <button class="qa-btn" data-action="migrateall" title="makemigrations && migrate">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Make + apply all
+          </button>
+          <button class="qa-btn" data-action="flush" title="python manage.py flush --noinput">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            Flush database
+          </button>
+          <div class="qa-section">PROJECT</div>
+          <button class="qa-btn" data-action="createsuperuser" title="python manage.py createsuperuser">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Create superuser
+          </button>
+          <button class="qa-btn" data-action="shell" title="python manage.py shell">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            Django shell
+          </button>
+          <button class="qa-btn" data-action="check" title="python manage.py check">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Check project
+          </button>
+          <button class="qa-btn" data-action="collectstatic" title="python manage.py collectstatic --noinput">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Collect static
+          </button>
+          <button class="qa-btn" data-action="test" title="python manage.py test --noinput">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Run tests
+          </button>
+        </div>
       </div>
 
       <!-- Django Panel -->
