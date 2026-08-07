@@ -48,6 +48,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       sandbox: false,
+      allowFileAccessFromFileUrls: true,
     },
   });
   win.loadFile('index.html');

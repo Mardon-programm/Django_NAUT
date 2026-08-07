@@ -3,14 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://127.0.0.1:* ws://127.0.0.1:*
-                 https://*.jsdelivr.net https://*.cdnjs.cloudflare.com
+        content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*
                  https://api.groq.com;
-                 script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:
-                 https://*.jsdelivr.net https://*.cdnjs.cloudflare.com;
+                 script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
                  connect-src 'self' 'unsafe-inline' data: blob: http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*
-                 https://*.jsdelivr.net https://*.cdnjs.cloudflare.com
-                 https://api.groq.com;">
+                 https://api.groq.com;
+                 worker-src 'self' data: blob:;">
   <title>DjangoNAUT</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -1378,8 +1376,8 @@
     }
   </script>
 
-  <!-- Monaco Editor loader (defines global define() - AMD) -->
-  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+  <!-- Monaco Editor loader (defines global define() - AMD) — vendored locally, no CDN -->
+  <script src="./node_modules/monaco-editor/min/vs/loader.js"></script>
 
   <script>
     window._errorQueue = [];

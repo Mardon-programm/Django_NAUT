@@ -1,4 +1,12 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const path = require('path');
+const { pathToFileURL } = require('url');
+
+// Absolute file:// URL to the vendored Monaco editor (works in dev and packaged)
+contextBridge.exposeInMainWorld(
+  'nautMonacoBaseUrl',
+  pathToFileURL(path.join(__dirname, 'node_modules', 'monaco-editor', 'min')).toString()
+);
 
 // ── IPC API ────────────────────────────────────────────────────────────
 

@@ -10,6 +10,7 @@ MIDDLEWARE in settings.py.
 
 import inspect
 import json
+import re
 import time
 import traceback
 
@@ -18,6 +19,8 @@ from django.utils.deprecation import MiddlewareMixin
 
 from django_naut.telemetry import get_client
 
+# Intentionally excluded: cookies and auth headers carry session tokens and
+# credentials — they are never captured. Keep the list to non-sensitive meta.
 _REQUEST_HEADERS = (
     ("HTTP_HOST", "Host"),
     ("HTTP_USER_AGENT", "User-Agent"),
@@ -28,12 +31,65 @@ _REQUEST_HEADERS = (
     ("HTTP_ORIGIN", "Origin"),
     ("CONTENT_TYPE", "Content-Type"),
     ("HTTP_X_REQUESTED_WITH", "X-Requested-With"),
-    ("HTTP_COOKIE", "Cookie"),
-    ("HTTP_AUTHORIZATION", "Authorization"),
 )
 
 _BODY_CAPTURE_LIMIT = 64 * 1024  # bodies up to this size get JSON parsing
 _BODY_SEND_LIMIT = 16 * 1024     # only this slice is sent to the IDE
+
+_SENSITIVE_SUBSTRINGS = (
+    "password",
+    "passwd",
+    "pwd",
+    "secret",
+    "token",
+    "apikey",
+    "api_key",
+    "authorization",
+    "auth",
+    "cookie",
+    "session",
+    "csrf",
+    "credit",
+    "card",
+    "cvv",
+    "private_key",
+    "access_key",
+)
+
+_BODY_JSON_SECRET = re.compile(
+    r'(?i)("(?:[^"\\]*(?:password|passwd|token|secret|apikey|api_key|authorization|sessionid|csrf)[^"\\]*)"\s*:\s*)"[^"]*"'
+)
+_BODY_FORM_SECRET = re.compile(
+    r"(?i)((?:^|[;&])(?:[a-z0-9_.-]*(?:password|passwd|token|secret|apikey|api_key|authorization|sessionid|csrf)[a-z0-9_.-]*)=)[^&;\r\n]*"
+)
+
+
+def _looks_sensitive(key):
+    k = str(key).lower().replace("-", "").replace("_", "")
+    return any(s in k for s in _SENSITIVE_SUBSTRINGS)
+
+
+def _redact(data):
+    if isinstance(data, dict):
+        return {
+            key: ("***" if _looks_sensitive(key) else _redact(value))
+            for key, value in data.items()
+        }
+    if isinstance(data, list):
+        return [_redact(item) for item in data]
+    return data
+
+
+def _redact_body(body):
+    """Redact obvious secret fields from raw body text (JSON/form patterns)."""
+    if not body:
+        return body
+    try:
+        body = _BODY_JSON_SECRET.sub(r'\1"***"', body)
+        body = _BODY_FORM_SECRET.sub(r"\1***", body)
+    except Exception:
+        pass
+    return body
 
 
 def _get_port():
@@ -112,7 +168,7 @@ def _capture_request(request):
     if method in ("GET", "HEAD"):
         params = _flat_params(getattr(request, "GET", None))
         if params:
-            info["params"] = params
+            info["params"] = _redact(params)
         return info
 
     if method in ("POST", "PUT", "PATCH", "DELETE"):
@@ -135,16 +191,16 @@ def _capture_request(request):
             return info
         if size > _BODY_SEND_LIMIT:
             info["truncated"] = True
-        info["body"] = body[:_BODY_SEND_LIMIT].decode("utf-8", "replace")
+        info["body"] = _redact_body(body[:_BODY_SEND_LIMIT].decode("utf-8", "replace"))
         if "application/json" in ctype and size <= _BODY_CAPTURE_LIMIT:
             try:
-                info["json"] = json.loads(body.decode("utf-8", "replace"))
+                info["json"] = _redact(json.loads(body.decode("utf-8", "replace")))
             except Exception:
                 pass
         if "application/x-www-form-urlencoded" in ctype or not ctype:
             params = _flat_params(getattr(request, "POST", None))
             if params:
-                info["params"] = params
+                info["params"] = _redact(params)
         return info
 
     return info
