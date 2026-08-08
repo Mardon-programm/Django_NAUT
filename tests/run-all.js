@@ -11,6 +11,10 @@ require('./wiring.test.js');
 require('./bughunter.test.js');
 require('./cli.test.js');
 require('./drf-endpoints.test.js');
+require('./vscode-import.test.js');
+require('./vscode-extension.test.js');
+require('./emmet-lite.test.js');
+require('./python-format.test.js');
 
 const fail = run();
 console.log('suite time: ' + (Date.now() - t0) + 'ms');

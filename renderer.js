@@ -2271,9 +2271,34 @@
       tab._content = content;
       markTabModified(tab.path, false);
       outputPrint('Saved: ' + tab.name, 'out-success');
+      if (localStorage.getItem('editor_formatonsave') === '1' && /\.(py|pyw|pyi)$/i.test(tab.name)) {
+        formatCurrentFile();
+      }
     } catch (err) {
       showToast('Error saving: ' + err.message, 'error');
       termPrint('Error: ' + err.message, 'line-stderr');
+    }
+  }
+
+  // Format the open Python file with the local formatter (black > autopep8 > yapf).
+  async function formatCurrentFile() {
+    const tab = openTabs.find((t) => t.id === activeTabId);
+    if (!tab) return;
+    if (!currentFolder) { showToast('Open a folder first.', 'warning'); return; }
+    if (!/\.(py|pyw|pyi)$/i.test(tab.name)) { showToast('Formatting is available for Python files.', 'info'); return; }
+    const content = getEditorValue();
+    try {
+      const res = await window.api.editor.format({ root: currentFolder, filePath: tab.path, content });
+      if (res && res.ok && res.formatted !== null && res.formatted !== content) {
+        setEditorValue(res.formatted);
+        tab._content = res.formatted;
+        markTabModified(tab.path, true);
+        showToast('Formatted with ' + res.formatter + '.', 'success');
+      } else if (res && !res.ok) {
+        showToast('Format failed: ' + (res.error || 'unknown'), 'warning');
+      }
+    } catch (err) {
+      showToast('Format error: ' + err.message, 'error');
     }
   }
 
@@ -2354,7 +2379,10 @@
   async function openFolder() {
     const folder = await window.api.dialog.openFolder();
     if (!folder) return;
+    await openFolderAt(folder);
+  }
 
+  async function openFolderAt(folder) {
     currentFolder = folder;
     addRecentFolder(folder);
     const name = folder.split(/[/\\]/).pop();
@@ -2390,6 +2418,17 @@
       showToast('Django project not detected in this folder.', 'warning');
     }
     nautAfterFolderOpen();
+    if (!nautOnboarded()) {
+      nautMarkOnboarded();
+      try {
+        const res = await window.api.django.bughunt(currentFolder);
+        const issues = (res && res.issues) ? res.issues.length : 0;
+        if (issues > 0) {
+          showToast('Found ' + issues + ' issues — check Bug Hunter for auto-fixes.', 'success');
+          runBugHunter();
+        }
+      } catch (e) {}
+    }
   }
 
   async function createProject() {
@@ -3297,6 +3336,13 @@
                 </div>
                 <input type="checkbox" id="settings-minimap" checked>
               </div>
+              <div class="settings-toggle-row">
+                <div>
+                  <div class="settings-toggle-label">Format on Save</div>
+                  <div class="settings-toggle-desc">Format Python files with black / autopep8 / yapf on save</div>
+                </div>
+                <input type="checkbox" id="settings-formatonsave">
+              </div>
               <div class="settings-group">
                 <label class="settings-label">Auto-Save Interval</label>
                 <select class="settings-select" id="settings-autosave">
@@ -3308,6 +3354,14 @@
                   <option value="30000">30 seconds</option>
                 </select>
                 <div class="settings-hint">Automatically save modified files.</div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-title">VS Code Import</div>
+              <div class="settings-hint">Bring your theme, editor options and keyboard shortcuts over from Visual Studio Code. Imports user settings, <code>.vscode/settings.json</code> and <code>keybindings.json</code> of the open project.</div>
+              <div style="margin-top:8px;">
+                <button class="btn" id="vscode-import-btn" style="font-size:11px;">Import from VS Code…</button>
               </div>
             </div>
 
@@ -3352,6 +3406,7 @@
     $('#settings-wordwrap').checked = savedWordWrap;
     $('#settings-minimap').checked = savedMinimap;
     $('#settings-autosave').value = savedAutoSave;
+    $('#settings-formatonsave').checked = localStorage.getItem('editor_formatonsave') === '1';
 
     const hotkeyGrid = $('#hotkey-grid');
     const currentHotkeys = getHotkeys();
@@ -3459,10 +3514,113 @@
       localStorage.setItem('editor_autosave_interval', autoSaveInterval);
       if (autoSaveInterval > 0) startAutoSave(); else stopAutoSave();
 
+      localStorage.setItem('editor_formatonsave', $('#settings-formatonsave').checked ? '1' : '0');
+
       closeModal();
       outputPrint('Settings saved.', 'out-success');
       termPrint('Settings saved.', 'line-info');
     });
+
+    $('#vscode-import-btn')?.addEventListener('click', importFromVscode);
+  }
+
+  // ── VS Code import ────────────────────────────────────────────────────
+
+  function vscodeImportPreviewHtml(config) {
+    let html = '<div class="settings-section-title">Found in VS Code</div>';
+    let n = 0;
+    if (config && config.theme) {
+      html += '<div class="vscode-import-row"><label class="settings-toggle"><input type="checkbox" data-imp="theme" checked>' +
+        '<span class="vscode-import-label">Theme → <b>' + escapeHtml(config.theme) + '</b></span></label></div>';
+      n++;
+    }
+    if (config && config.editor && Object.keys(config.editor).length) {
+      const opts = [];
+      if (config.editor.fontSize) opts.push('fontSize ' + config.editor.fontSize);
+      if (config.editor.fontFamily) opts.push('font ' + escapeHtml(config.editor.fontFamily));
+      if (config.editor.tabSize) opts.push('tabSize ' + config.editor.tabSize);
+      if (typeof config.editor.wordWrap === 'string') opts.push('wordWrap ' + config.editor.wordWrap);
+      if (typeof config.editor.minimap === 'boolean') opts.push('minimap ' + (config.editor.minimap ? 'on' : 'off'));
+      if (typeof config.editor.formatOnSave === 'boolean') opts.push('formatOnSave ' + (config.editor.formatOnSave ? 'on' : 'off'));
+      if (config.editor.pythonPath) opts.push('python path');
+      if (config.editor.extraPaths) opts.push(config.editor.extraPaths.length + ' analysis paths');
+      html += '<div class="vscode-import-row"><label class="settings-toggle"><input type="checkbox" data-imp="editor" checked>' +
+        '<span class="vscode-import-label">Editor → ' + (opts.join(', ') || 'yes') + '</span></label></div>';
+      n++;
+    }
+    if (config && config.hotkeys && Object.keys(config.hotkeys).length) {
+      const hk = Object.keys(config.hotkeys).map((a) => HOTKEY_LABELS[a] || a + ': ' + config.hotkeys[a]).join(', ');
+      html += '<div class="vscode-import-row"><label class="settings-toggle"><input type="checkbox" data-imp="hotkeys" checked>' +
+        '<span class="vscode-import-label">Hotkeys → ' + escapeHtml(hk) + '</span></label></div>';
+      n++;
+    }
+    if (!n) return null;
+    html += '<div class="vscode-import-note">Nothing is changed until you press Import.</div>';
+    return html;
+  }
+
+  async function importFromVscode() {
+    let raw;
+    try { raw = await window.api.vscode.collect(currentFolder || null); } catch (e) { showToast('Import failed: ' + e.message, 'error'); return; }
+    if (!raw) {
+      showToast('No VS Code settings or keybindings found (checked user config and .vscode/).', 'warning');
+      return;
+    }
+    const config = await window.api.vscode.build(raw);
+    const preview = vscodeImportPreviewHtml(config);
+    if (!preview) { showToast('VS Code files found, but nothing importable matched.', 'warning'); return; }
+
+    const overlay = nautModal('Import from VS Code', preview);
+    const footer = document.createElement('div');
+    footer.className = 'modal-footer';
+    footer.innerHTML = '<button class="btn" id="vscode-import-cancel">Cancel</button>' +
+      '<button class="btn btn-primary" id="vscode-import-apply">Import</button>';
+    overlay.querySelector('.modal-body').appendChild(footer);
+    overlay.querySelector('#vscode-import-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#vscode-import-apply').addEventListener('click', () => {
+      const want = {
+        theme: overlay.querySelector('[data-imp="theme"]')?.checked !== false,
+        editor: overlay.querySelector('[data-imp="editor"]')?.checked !== false,
+        hotkeys: overlay.querySelector('[data-imp="hotkeys"]')?.checked !== false,
+      };
+      applyVscodeImport(config, want);
+      overlay.remove();
+      showToast('VS Code settings imported.', 'success');
+    });
+  }
+
+  function applyVscodeImport(config, want) {
+    if (config.theme && want.theme) {
+      localStorage.setItem('editor_theme', config.theme);
+      applyMonacoTheme(config.theme);
+    }
+    if (config.editor && want.editor) {
+      const e = config.editor;
+      if (e.fontSize) { localStorage.setItem('editor_fontsize', e.fontSize); }
+      if (e.tabSize) { localStorage.setItem('editor_tabsize', e.tabSize); }
+      if (e.wordWrap) { localStorage.setItem('editor_wordwrap', e.wordWrap === 'on'); }
+      if (typeof e.minimap === 'boolean') { localStorage.setItem('editor_minimap', e.minimap); }
+      if (editorMode === 'monaco' && window._monacoEditor) {
+        window._monacoEditor.updateOptions({
+          fontSize: e.fontSize || parseInt(localStorage.getItem('editor_fontsize') || '14'),
+          tabSize: e.tabSize || parseInt(localStorage.getItem('editor_tabsize') || '4'),
+          wordWrap: e.wordWrap ? e.wordWrap : undefined,
+          minimap: { enabled: typeof e.minimap === 'boolean' ? e.minimap : undefined },
+        });
+      }
+      if (e.autoSave) {
+        const map = { off: 0, afterDelay: 1000, onFocusChange: 0 };
+        const v = map[e.autoSave] !== undefined ? map[e.autoSave] : 0;
+        localStorage.setItem('editor_autosave_interval', v);
+        if (v > 0) startAutoSave(); else stopAutoSave();
+      }
+    }
+    if (config.hotkeys && want.hotkeys) {
+      const saved = {};
+      try { Object.assign(saved, JSON.parse(localStorage.getItem('custom_hotkeys') || '{}')); } catch {}
+      Object.assign(saved, config.hotkeys);
+      localStorage.setItem('custom_hotkeys', JSON.stringify(saved));
+    }
   }
 
   // ── Docker Panel ──────────────────────────────────────────────────────
@@ -3786,6 +3944,7 @@
   $('#btn-create-project')?.addEventListener('click', createProject);
   $('#btn-scan')?.addEventListener('click', runBugHunter);
   $('#btn-settings')?.addEventListener('click', openSettings);
+  window.api.app?.onOpenFolder((folder) => { openFolderAt(folder); });
   $('#btn-aitests-generate')?.addEventListener('click', runAITests);
   $('#btn-aitests-save')?.addEventListener('click', saveAITestsToFile);
 
@@ -3858,6 +4017,7 @@
     'moveLineDown': 'Alt+Down',
     'find': 'Ctrl+F',
     'replace': 'Ctrl+H',
+    'formatFile': 'Shift+Alt+F',
   };
 
   const HOTKEY_LABELS = {
@@ -3880,6 +4040,7 @@
     'moveLineDown': 'Move Line Down',
     'find': 'Find',
     'replace': 'Replace',
+    'formatFile': 'Format Document',
   };
 
   function getHotkeys() {
@@ -4145,6 +4306,7 @@
       }
       if (matchHotkey(e, hotkeys.settings)) { e.preventDefault(); e.stopPropagation(); openSettings(); return; }
       if (matchHotkey(e, hotkeys.lintFile)) { e.preventDefault(); e.stopPropagation(); lintCurrentFile(); return; }
+      if (matchHotkey(e, hotkeys.formatFile)) { e.preventDefault(); e.stopPropagation(); formatCurrentFile(); return; }
       if (matchHotkey(e, hotkeys.quickOpen)) { e.preventDefault(); e.stopPropagation(); showQuickOpen(); return; }
       if (matchHotkey(e, hotkeys.goToLine)) { e.preventDefault(); e.stopPropagation(); showGoToLine(); return; }
       if (e.ctrlKey && e.shiftKey && e.key === 'Q') {
@@ -4617,8 +4779,45 @@
     try {
       monaco.editor.registerCommand('naut.sqlDetails', (_a, file, line) => nautShowSqlDetails(file, line));
       monaco.editor.registerCommand('naut.signalDetails', (_a, file, line) => nautShowSignalDetails(file, line));
+      if (!window.__nautEmmetBound && window._monacoEditor) {
+        window._monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyE, () => emmetExpandAtCursor());
+        window.__nautEmmetBound = true;
+      }
       window.__nautCmdsRegistered = true;
     } catch (e) {}
+  }
+
+  // Emmet-lite: expand the abbreviation before the cursor (Ctrl+E in the editor).
+  async function emmetExpandAtCursor() {
+    if (editorMode !== 'monaco' || !window._monacoEditor || typeof monaco === 'undefined') return;
+    const editor = window._monacoEditor;
+    const model = editor.getModel();
+    const pos = editor.getPosition();
+    const line = model.getLineContent(pos.lineNumber);
+    const upto = line.slice(0, pos.column - 1);
+    const m = /([a-zA-Z][\w.#>{}*\s-]*?)$/.exec(upto);
+    if (!m) return;
+    const abbr = m[1];
+    if (!/^[a-zA-Z][\w.#>{}\*\s-]*$/.test(abbr)) return;
+    let html;
+    try {
+      html = await window.api.emmet.expand(abbr);
+    } catch (e) { return; }
+    if (!html) { showToast('Not a valid Emmet abbreviation: ' + abbr, 'info'); return; }
+    const startCol = pos.column - abbr.length;
+    const prefix = upto.slice(0, startCol);
+    const indent = /^(\s*)/.exec(prefix)[1] || '';
+    const result = html.replace(/\n/g, '\n' + indent);
+    const range = new monaco.Range(pos.lineNumber, startCol, pos.lineNumber, pos.column - 1);
+    editor.executeEdits('emmet', [{ range, text: result }]);
+    const firstClose = result.indexOf('>');
+    if (firstClose >= 0) {
+      const relLine = result.slice(0, firstClose + 1).split('\n').length;
+      const lineStart = result.slice(0, firstClose + 1).lastIndexOf('\n');
+      const relCol = firstClose + 1 - (lineStart + 1);
+      editor.setPosition({ lineNumber: pos.lineNumber + relLine - 1, column: relCol + 1 });
+    }
+    editor.focus();
   }
 
   function registerCodeLenses() {
@@ -5891,6 +6090,43 @@
       const hint = $('#agent-status');
       if (hint) hint.textContent = info.installed ? 'Agent: installed' : (info.present ? 'Agent: needs install (pip install -e …)' : 'Agent: not found');
     } catch (e) {}
+  }
+
+  // ── First-run onboarding ──────────────────────────────────────────────
+
+  const ONBOARD_FEATURES = [
+    ['N+1 Auto-fix', 'Requests panel detects repeated queries and inserts select_related()/prefetch_related() for you.'],
+    ['Bug Hunter', 'Static analysis with safe one-click fixes for N+1, unused imports, DEBUG leaks, secrets.'],
+    ['Migration Guard', 'Interactive migration graph, branch conflicts and model drift (makemigrations --check).'],
+    ['DRF Explorer', 'Routers, viewsets, serializers — with Send to API Client test requests.'],
+    ['Live Telemetry', 'SQL + errors from your running Django app via the python agent.'],
+    ['Security & Deps', 'Hardcoded secrets, SQLi, XSS, CSRF and vulnerable packages (PyPI + OSV).'],
+  ];
+
+  function nautOnboarded() { return localStorage.getItem('naut_onboarded') === '1'; }
+
+  function nautMarkOnboarded() { localStorage.setItem('naut_onboarded', '1'); }
+
+  function nautShowWelcome() {
+    if (nautOnboarded()) return;
+    const cards = ONBOARD_FEATURES.map((pair) => '<div class="ob-card"><div class="ob-card-title">' + pair[0] + '</div><div class="ob-card-desc">' + pair[1] + '</div></div>').join('');
+    const overlay = nautModal('Welcome to DjangoNAUT', '<div class="ob-intro">Your Django Control Center. Open a project and we will analyze it for real problems in under a minute.</div><div class="ob-grid">' + cards + '</div>');
+    const footer = document.createElement('div');
+    footer.className = 'modal-footer';
+    footer.innerHTML = '<button class="btn" id="ob-import-vscode">Import VS Code settings</button>' +
+      '<button class="btn" id="ob-skip">Skip</button>' +
+      '<button class="btn btn-primary" id="ob-open">Open Django project</button>';
+    overlay.querySelector('.modal-body').appendChild(footer);
+    overlay.querySelector('#ob-import-vscode').addEventListener('click', () => { nautMarkOnboarded(); overlay.remove(); importFromVscode(); });
+    overlay.querySelector('#ob-skip').addEventListener('click', () => { nautMarkOnboarded(); overlay.remove(); });
+    overlay.querySelector('#ob-open').addEventListener('click', () => { overlay.remove(); openFolder(); });
+  }
+
+  function nautInitOnboarding() {
+    setTimeout(() => {
+      if (nautOnboarded() || currentFolder) return;
+      nautShowWelcome();
+    }, 900);
   }
 
   // ── Live Log Viewer ─────────────────────────────────────────────────────
@@ -7681,4 +7917,6 @@
     }
     setTimeout(nautInitCodeLens, 700);
   })();
+
+  nautInitOnboarding();
 })();

@@ -16,6 +16,26 @@ contextBridge.exposeInMainWorld('api', {
     saveFile: (opts) => ipcRenderer.invoke('dialog:saveFile', opts),
   },
 
+  vscode: {
+    collect: (folder) => ipcRenderer.invoke('vscode:collect', folder),
+    build: (raw) => ipcRenderer.invoke('vscode:build', raw),
+  },
+
+  editor: {
+    format: (opts) => ipcRenderer.invoke('editor:format', opts),
+  },
+
+  emmet: {
+    expand: (abbr) => ipcRenderer.invoke('emmet:expand', abbr),
+  },
+
+  app: {
+    onOpenFolder: (callback) => {
+      ipcRenderer.removeAllListeners('app:open-folder');
+      ipcRenderer.on('app:open-folder', (_event, folder) => callback(folder));
+    },
+  },
+
   fs: {
     readdir: (dirPath) => ipcRenderer.invoke('fs:readdir', dirPath),
     readfile: (filePath) => ipcRenderer.invoke('fs:readfile', filePath),

@@ -149,10 +149,19 @@ jobs:
 
 Параметры: `project-path`, `fail-on`, `min-severity`, `no-deps`, `node-version`, `json-report`, `markdown-report`, `cli-source`. Билд падает, если найдены проблемы выше порога; JSON и markdown-отчёты выкладываются артефактом.
 
+## Переход из VS Code
+
+DjangoNAUT снижает стоимость перехода в четыре шага:
+
+1. **Импорт настроек** — Settings → «Import from VS Code…»: тянет тему (Dark+/Monokai/Dracula/…), шрифт, tab size, word wrap, minimap и горячие клавиши (`keybindings.json`) из пользовательских настроек и `.vscode/` проекта. Ничего не меняется без подтверждения.
+2. **First-run onboarding** — при первом запуске: welcome-экран с фичами, а после открытия проекта — автоматический прогон Bug Hunter с тостом «Found N issues».
+3. **Companion-расширение** (`vscode-extension/`) — команда «DjangoNAUT: Open Project» запускает приложение с текущей папкой (`--open <folder>`); повторный запуск фокусирует существующее окно. Сборка: `npx @vscode/vsce package`.
+4. **Editor-паритет** — Ctrl+D (add selection to next match), мультикурсор, Ctrl+/, Alt+↑/↓ работают как в VS Code; **Emmet-lite** (Ctrl+E: `div#app>span*3` → разметка), **Format on Save** (black → autopep8 → yapf) и **Format Document** (Shift+Alt+F).
+
 ## Тесты
 
 ```bash
-npm test   # 41/41 PASS: синтаксис, Bug Hunter, CLI, миграции, N+1 (в т.ч. автофикс), python-agent, wiring
+npm test   # 65/65 PASS: синтаксис, Bug Hunter, CLI, миграции, N+1 (в т.ч. автофикс), python-agent, wiring, VS Code import, Emmet, formatting
 ```
 
 ## Сборка

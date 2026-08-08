@@ -31,6 +31,9 @@ const i18nInspector = require('./i18n-inspector');
 const adminInspector = require('./admin-inspector');
 const drfInspector = require('./drf-inspector');
 const migrationGraph = require('./migration-graph');
+const vscodeImport = require('./vscode-import');
+const pythonFormat = require('./python-format');
+const emmetLite = require('./emmet-lite');
 
 const FULL_LIMITS = { jsonLimits: { list: 10000, dict: 1000, depth: 8 } };
 
@@ -40,7 +43,7 @@ app.commandLine.appendSwitch('disable-gpu-compositing');
 const activeProcesses = new Map();
 const activeWatchers = new Map();
 
-function createWindow() {
+function createWindow(openFolderArg) {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -48,14 +51,48 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      sandbox: false,
-      allowFileAccessFromFileUrls: true,
-    },
+      nodeIntegration: false,
+      sandbox: false
+    }
   });
   win.loadFile('index.html');
   win.setMenu(null);
+  if (openFolderArg) {
+    win.webContents.once('did-finish-load', () => {
+      try { win.webContents.send('app:open-folder', openFolderArg); } catch {}
+    });
+  }
 }
 
+// Folder to open passed via `--open <path>` or a bare folder argument.
+function findOpenArg(argv) {
+  const args = Array.isArray(argv) ? argv : [];
+  for (let i = 0; i < args.length - 1; i++) {
+    if (args[i] === '--open' && args[i + 1]) return args[i + 1];
+  }
+  for (const a of args) {
+    if (a && !a.startsWith('-') && !/\.[a-z0-9]{1,5}$/i.test(a) && fs.existsSync(a)) return a;
+  }
+  return null;
+}
+
+
+const gotSingleLock = app.requestSingleInstanceLock();
+if (!gotSingleLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    const folder = findOpenArg(commandLine);
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+      if (folder) {
+        try { win.webContents.send('app:open-folder', folder); } catch {}
+      }
+    }
+  });
+}
 
 app.whenReady().then(async () => {
   await startTerminalServer();
@@ -87,7 +124,7 @@ app.whenReady().then(async () => {
     console.error('[telemetry] failed to start:', err.message);
   }
 
-  createWindow();
+  createWindow(findOpenArg(process.argv));
 });
 
 app.on('window-all-closed', () => {
@@ -101,13 +138,51 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
-
 // ── Dialog ─────────────────────────────────────────────────────────────────
 
 ipcMain.handle('dialog:openFolder', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   if (result.canceled) return null;
   return result.filePaths[0];
+});
+
+// ── VS Code import ──────────────────────────────────────────────────────────
+
+function vscodeUserConfigDir() {
+  if (process.platform === 'win32') return process.env.APPDATA ? path.join(process.env.APPDATA, 'Code', 'User') : null;
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User');
+  return path.join(os.homedir(), '.config', 'Code', 'User');
+}
+
+function readJsonFileSilent(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch { return null; }
+}
+
+// Collect raw VS Code config (user + project level) so the renderer can build
+// the import preview. Pure mapping lives in vscode-import.js.
+ipcMain.handle('vscode:collect', async (_event, folder) => {
+  const userDir = vscodeUserConfigDir();
+  const userSettings = userDir ? readJsonFileSilent(path.join(userDir, 'settings.json')) : null;
+  const userKeybindings = userDir ? readJsonFileSilent(path.join(userDir, 'keybindings.json')) : null;
+  let projectSettings = null;
+  let projectKeybindings = null;
+  if (folder && typeof folder === 'string') {
+    const vscodeDir = path.join(folder, '.vscode');
+    projectSettings = readJsonFileSilent(path.join(vscodeDir, 'settings.json'));
+    projectKeybindings = readJsonFileSilent(path.join(vscodeDir, 'keybindings.json'));
+  }
+  const hasUser = !!userSettings || !!userKeybindings;
+  const hasProject = !!projectSettings || !!projectKeybindings;
+  if (!hasUser && !hasProject) return null;
+  return { userSettings, userKeybindings, projectSettings, projectKeybindings };
+});
+
+// Pure mapping (vscode-import.js) runs in main; renderer gets the prepared blob.
+ipcMain.handle('vscode:build', async (_event, raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  return vscodeImport.buildImport(raw.userSettings, raw.userKeybindings, raw.projectSettings, raw.projectKeybindings);
 });
 
 // ── File system ────────────────────────────────────────────────────────────
@@ -1164,6 +1239,39 @@ ipcMain.handle('security:scan', (_e, root) => {
 });
 
 // ── Enterprise Audit Reports ───────────────────────────────────────────────
+
+ipcMain.handle('emmet:expand', async (_e, abbr) => {
+  return emmetLite.expandAbbreviation(abbr);
+});
+
+ipcMain.handle('editor:format', async (_e, { root, filePath, content, formatter }) => {
+  if (!filePath || !pythonFormat.isPythonFile(filePath)) {
+    return { ok: false, formatted: null, error: 'Not a Python file' };
+  }
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'naut-fmt-'));
+  const tmpFile = path.join(tmpDir, path.basename(filePath));
+  try {
+    fs.writeFileSync(tmpFile, content, 'utf8');
+    const py = shellRPC.findPython(root || process.cwd());
+    const names = formatter ? [formatter] : pythonFormat.FORMATTERS.map((f) => f.name);
+    let lastErr = 'No formatter available (try pip install black)';
+    for (const name of names) {
+      const build = pythonFormat.buildCommand(py, name, tmpFile);
+      if (!build) continue;
+      const res = await shellRPC.runCommand(build.root, build.cmd, 30000);
+      if (res.ok) {
+        const formatted = fs.readFileSync(tmpFile, 'utf8');
+        return { ok: true, formatted, formatter: name };
+      }
+      if (res.stderr && res.stderr.trim()) lastErr = res.stderr.trim().split('\n')[0];
+    }
+    return { ok: false, formatted: null, error: lastErr };
+  } catch (err) {
+    return { ok: false, formatted: null, error: err.message };
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  }
+});
 
 ipcMain.handle('report:generate', async (_e, root) => {
   const t0 = Date.now();

@@ -1,0 +1,32 @@
+{
+  "name": "djangonaut",
+  "displayName": "DjangoNAUT",
+  "description": "Open the current Django project in DjangoNAUT — your Django Control Center (N+1 auto-fix, Migration Guard, DRF Explorer, Security).",
+  "version": "1.0.0",
+  "publisher": "mardon-programm",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onCommand:djangonaut.openProject"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "djangonaut.openProject",
+        "title": "Open Project in DjangoNAUT",
+        "category": "DjangoNAUT"
+      }
+    ],
+    "configuration": {
+      "title": "DjangoNAUT",
+      "properties": {
+        "djangonaut.executablePath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the DjangoNAUT executable. Supports `${env:VAR}` and `%VAR%`. Leave empty to auto-detect the installed app on Windows (`%LOCALAPPDATA%\\Programs`), macOS (`/Applications`) or the `djangonaut` CLI on PATH."
+        }
+      }
+    }
+  }
+}
