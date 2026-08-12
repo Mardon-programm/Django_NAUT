@@ -65,4 +65,4 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS("[django_naut] telemetry on port %s" % (port or "disabled"))
         )
-        _start(port, host, list(options.get("args") or []))
+        _start(port, host, list(args or []))

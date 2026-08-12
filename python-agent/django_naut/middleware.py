@@ -8,6 +8,8 @@ Enabled automatically by `runserver_naut`; can also be added manually to
 MIDDLEWARE in settings.py.
 """
 
+import contextvars
+import functools
 import inspect
 import json
 import re
@@ -18,6 +20,40 @@ from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
 
 from django_naut.telemetry import get_client
+
+# Queries run on the thread-local connection of whichever thread executes them
+# (Django stores connections in ``threading.local``). Under ASGI a sync view
+# runs in a worker thread with its OWN connection, so a plain
+# ``connection.execute_wrapper()`` set from the middleware thread never sees
+# those queries. Instead we register request-scoped wrappers in a contextvar
+# (asgiref's ``sync_to_async`` copies contextvars into worker threads) and
+# patch ``CursorWrapper`` once so every query — on any thread/connection —
+# consults that contextvar.
+_NAUT_WRAPPERS: "contextvars.ContextVar[list]" = contextvars.ContextVar(
+    "naut_wrappers", default=[]
+)
+
+_CURSOR_PATCHED = False
+
+
+def _patch_cursor_execution():
+    """Install a global CursorWrapper hook that also applies contextvar wrappers."""
+    global _CURSOR_PATCHED
+    if _CURSOR_PATCHED:
+        return
+    import django.db.backends.utils as django_utils
+
+    original = django_utils.CursorWrapper._execute_with_wrappers
+
+    def _execute_with_wrappers(self, sql, params, many, executor):
+        context = {"connection": self.db, "cursor": self}
+        wrappers = list(_NAUT_WRAPPERS.get()) + list(self.db.execute_wrappers)
+        for wrapper in reversed(wrappers):
+            executor = functools.partial(wrapper, executor)
+        return executor(sql, params, many, context)
+
+    django_utils.CursorWrapper._execute_with_wrappers = _execute_with_wrappers
+    _CURSOR_PATCHED = True
 
 # Intentionally excluded: cookies and auth headers carry session tokens and
 # credentials — they are never captured. Keep the list to non-sensitive meta.
@@ -249,41 +285,55 @@ def _capture_response(response):
     return info
 
 
+def _make_query_wrapper(queries):
+    def wrapper(execute, sql, params, many, context):
+        start = time.perf_counter()
+        try:
+            return execute(sql, params, many, context)
+        finally:
+            elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
+            queries.append(
+                {
+                    "sql": (sql or "")[:4000],
+                    "time": elapsed_ms,
+                    "stack": _capture_stack(),
+                }
+            )
+
+    return wrapper
+
+
 class DjangoNautMiddleware(MiddlewareMixin):
     def __init__(self, get_response):
         super().__init__(get_response)
         get_client().port = _get_port()
 
     def __call__(self, request):
-        from django.db import connection
+        # MiddlewareMixin switches to async mode when the handler is a
+        # coroutine function (ASGI/daphne projects, which Django 5 runserver
+        # auto-detects): in that mode we must return a coroutine the framework
+        # awaits, not treat it as the response.
+        if self.async_mode:
+            return self._async_run(request)
+        return self._sync_run(request)
+
+    def _sync_run(self, request):
+        _patch_cursor_execution()
 
         queries = []
         client = get_client()
         project = _get_project()
         request_start = time.perf_counter()
-
-        def wrapper(execute, sql, params, many, context):
-            start = time.perf_counter()
-            try:
-                return execute(sql, params, many, context)
-            finally:
-                elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
-                queries.append(
-                    {
-                        "sql": (sql or "")[:4000],
-                        "time": elapsed_ms,
-                        "stack": _capture_stack(),
-                    }
-                )
-
         try:
             request_info = _capture_request(request)
         except Exception:
             request_info = None
         response_info = {}
+        response = None
+        status = None
+        token = _NAUT_WRAPPERS.set([_make_query_wrapper(queries)])
         try:
-            with connection.execute_wrapper(wrapper):
-                response = self.get_response(request)
+            response = self.get_response(request)
             status = getattr(response, "status_code", 200)
             response_info = _capture_response(response)
         except Exception as exc:
@@ -291,42 +341,108 @@ class DjangoNautMiddleware(MiddlewareMixin):
             self._report_error(request, exc)
             raise
         finally:
-            request_time = round((time.perf_counter() - request_start) * 1000, 2)
-            path = getattr(request, "path", "")
-            method = getattr(request, "method", "")
-            view = None
-            try:
-                view = getattr(request, "resolver_match", None)
-                if view:
-                    view = getattr(view, "func", None)
-                    view = getattr(view, "__name__", None) or getattr(view, "view_class", None).__name__
-            except Exception:
-                pass
-            user = "anon"
-            try:
-                req_user = getattr(request, "user", None)
-                if req_user is not None and getattr(req_user, "is_authenticated", False):
-                    user = req_user.get_username() if hasattr(req_user, "get_username") else str(req_user)
-            except Exception:
-                pass
-            client.send(
-                "sql",
-                {
-                    "project": project,
-                    "path": path,
-                    "method": method,
-                    "view": view,
-                    "status": status,
-                    "user": user,
-                    "queries": queries,
-                    "totalQueries": len(queries),
-                    "requestTime": request_time,
-                    "totalTime": round(sum(q["time"] for q in queries), 2),
-                    "requestInfo": request_info,
-                    "responseInfo": response_info,
-                },
+            _NAUT_WRAPPERS.reset(token)
+            self._report_sql(
+                request,
+                client,
+                project,
+                queries,
+                request_start,
+                request_info,
+                response_info,
+                status,
             )
         return response
+
+    async def _async_run(self, request):
+        _patch_cursor_execution()
+
+        queries = []
+        client = get_client()
+        project = _get_project()
+        request_start = time.perf_counter()
+        try:
+            request_info = _capture_request(request)
+        except Exception:
+            request_info = None
+        response_info = {}
+        response = None
+        status = None
+        token = _NAUT_WRAPPERS.set([_make_query_wrapper(queries)])
+        try:
+            response = await self.get_response(request)
+            status = getattr(response, "status_code", 200)
+            response_info = _capture_response(response)
+        except Exception as exc:
+            status = 500
+            self._report_error(request, exc)
+            raise
+        finally:
+            _NAUT_WRAPPERS.reset(token)
+            self._report_sql(
+                request,
+                client,
+                project,
+                queries,
+                request_start,
+                request_info,
+                response_info,
+                status,
+            )
+        return response
+
+    def _report_sql(
+        self,
+        request,
+        client,
+        project,
+        queries,
+        request_start,
+        request_info,
+        response_info,
+        status,
+    ):
+        request_time = round((time.perf_counter() - request_start) * 1000, 2)
+        path = getattr(request, "path", "")
+        method = getattr(request, "method", "")
+        view = None
+        try:
+            view = getattr(request, "resolver_match", None)
+            if view:
+                view = getattr(view, "func", None)
+                view = getattr(view, "__name__", None) or getattr(
+                    view, "view_class", None
+                ).__name__
+        except Exception:
+            pass
+        user = "anon"
+        try:
+            req_user = getattr(request, "user", None)
+            if req_user is not None and getattr(req_user, "is_authenticated", False):
+                user = (
+                    req_user.get_username()
+                    if hasattr(req_user, "get_username")
+                    else str(req_user)
+                )
+        except Exception:
+            pass
+        client.send(
+            "sql",
+            {
+                "project": project,
+                "path": path,
+                "method": method,
+                "view": view,
+                "status": status,
+                "user": user,
+                "queries": queries,
+                "totalQueries": len(queries),
+                "requestTime": request_time,
+                "totalTime": round(sum(q["time"] for q in queries), 2),
+                "requestInfo": request_info,
+                "responseInfo": response_info,
+            },
+        )
 
     def process_exception(self, request, exception):
         """Report unhandled exceptions.
