@@ -14,7 +14,7 @@
 
 | Проверка | Результат |
 | --- | --- |
-| `npm test` | ✅ 65/65 PASS (14 файлов) |
+| `npm test` | ✅ 66/66 PASS (в т.ч. новый reverse-check упаковки) |
 | VSIX-упаковка `vscode-extension/` | ✅ `djangonaut-1.0.0.vsix` (4.13 KB), + `.vscodeignore`; коммит `fee05eb` |
 | CLI audit на живом проекте `web_editor/` | ✅ Health 49/100, 24 findings, `--markdown`/`--output` пишут файлы (UTF-8 корректен), exit-код 1 при пороге error |
 | Отчёт: health score / breakdown / стоимость | ✅ `computeReport`: Security −40, Code quality −11.5, детализация корректен |
@@ -40,13 +40,29 @@
 `json.dumps(ensure_ascii=True)` делает JSON телеметрии ASCII-only, поэтому приёмник
 `telemetry-server.js` (`body += chunk`) безопасен. Кода менять не нужно.
 
-### Пересборка Windows-дистрибутива — PASS
+### Пересборка Windows-дистрибутива — PASS (с фиксом краша)
 
 `npm run build` (2026-08-13, `dist/` в .gitignore):
 - `DjangoNAUT Setup 1.0.5.exe` (NSIS) — 114 MB
 - `DjangoNAUT 1.0.5.exe` (portable) — 113.4 MB
 - В `dist/win-unpacked/resources/python-agent` проверены фиксы: `runserver_naut.py` → `_start(port, host, list(args or []))`,
   `middleware.py` → `async_mode`-диспетчер. Версия не менялась (1.0.5).
+
+### Критический баг установщика — исправлен
+
+**Симптом:** после установки `DjangoNAUT Setup 1.0.5.exe` приложение падало на старте:
+`Uncaught Exception: Error: Cannot find module './vscode-import'` в `resources\app.asar\main.js`.
+
+**Причина:** `vscode-import.js`, `python-format.js`, `emmet-lite.js` добавлены в коммите `b3bd702`,
+но не были включены в `build.files` → не попадали в app.asar. Тест `package-files.test.js` проверял
+только прямое направление («файл из build.files существует») и не ловил отсутствующие `require()`.
+
+**Исправление:**
+- `package.json`: в `build.files` добавлены `vscode-import.js`, `python-format.js`, `emmet-lite.js`.
+- `tests/package-files.test.js`: добавлен reverse-check — транзитивный обход `require()` от `main.js`
+  с проверкой, что каждый резолвится в упакованный файл. Проверено: до фикса он перечислял ровно эти 3
+  модуля, после фикса — пусто (`OK: all transitive requires are covered by build.files`).
+- app.asar пересобран; `\vscode-import.js`, `\python-format.js`, `\emmet-lite.js` подтверждены в пакете.
 
 ---
 
