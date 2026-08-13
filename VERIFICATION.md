@@ -40,6 +40,14 @@
 `json.dumps(ensure_ascii=True)` делает JSON телеметрии ASCII-only, поэтому приёмник
 `telemetry-server.js` (`body += chunk`) безопасен. Кода менять не нужно.
 
+### Пересборка Windows-дистрибутива — PASS
+
+`npm run build` (2026-08-13, `dist/` в .gitignore):
+- `DjangoNAUT Setup 1.0.5.exe` (NSIS) — 114 MB
+- `DjangoNAUT 1.0.5.exe` (portable) — 113.4 MB
+- В `dist/win-unpacked/resources/python-agent` проверены фиксы: `runserver_naut.py` → `_start(port, host, list(args or []))`,
+  `middleware.py` → `async_mode`-диспетчер. Версия не менялась (1.0.5).
+
 ---
 
 ## Сессия 2026-08-07 — v1.0.5 (исторический отчёт)
