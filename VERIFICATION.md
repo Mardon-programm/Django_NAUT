@@ -1,4 +1,40 @@
-# DjangoNAUT 1.0.5 — Отчёт о проверке готовности к запуску
+# DjangoNAUT — Отчёты о проверке
+
+---
+
+## Сессия 2026-08-13 — Регрессия telemetry + отчёты/API Client/Docker + VSIX
+
+Дата: 2026-08-13. Ветка `master`. Коммиты: `c6440c8` (фиксы агента), `fee05eb` (VSIX).
+
+### Результат
+
+Весь проверяемый функционал работает. Найденных новых багов нет; Docker-функции не тестировались «по-настоящему» — демон Docker Desktop не запущен (окружение), код-путь хендлеров проверен на graceful-ошибку.
+
+### Проверки
+
+| Проверка | Результат |
+| --- | --- |
+| `npm test` | ✅ 65/65 PASS (14 файлов) |
+| VSIX-упаковка `vscode-extension/` | ✅ `djangonaut-1.0.0.vsix` (4.13 KB), + `.vscodeignore`; коммит `fee05eb` |
+| CLI audit на живом проекте `web_editor/` | ✅ Health 49/100, 24 findings, `--markdown`/`--output` пишут файлы (UTF-8 корректен), exit-код 1 при пороге error |
+| Отчёт: health score / breakdown / стоимость | ✅ `computeReport`: Security −40, Code quality −11.5, детализация корректен |
+| Отчёт: экспорт MD/HTML/JSON | ✅ MD и JSON записаны корректно; HTML/PDF — код без изменений, генерируется из `buildMarkdown` |
+| API Client: GET/POST на живом сервере | ✅ GET `/` 200, POST `/api/read/` 200 (путь `/api/read/`, не `/api/read_file/`), POST 404 тоже корректно отдаётся |
+| Telemetry: события SQL | ✅ GET `/` → sql-событие (view `editor_view`, status 200); 404 тоже ловится; POST login → `totalQueries=1` с реальным `SELECT ... FROM "auth_user"` |
+| Telemetry: live-приёмник на 127.0.0.1 | ✅ `naut-receiver.js` (временный), события в `%TEMP%\naut-live-events.log` |
+| Docker IPC-хендлеры (7) | ✅ Код корректен, при недоступном демоне возвращают `{ error }` без падения; демон не запущен — окружение |
+
+### Телеграмма живого E2E
+
+1. `node naut-receiver.js` → порт 59900 (в `%TEMP%\naut-live-port.txt`)
+2. `python manage.py runserver_naut --naut-port 59900 127.0.0.1:8765` (в `web_editor/`)
+3. GET `/` → 200, sql-событие в приёмнике
+4. POST `/admin/login/` с неверным паролем → 200, `totalQueries=1`, `SELECT auth_user`
+5. Процессы убиты, порты 8765/59900 свободны
+
+---
+
+## Сессия 2026-08-07 — v1.0.5 (исторический отчёт)
 
 Дата: 2026-08-07. Ветка `master`, коммит `d28bab6`. Релиз **v1.0.5** опубликован на GitHub (9 артефактов, все 3 платформы).
 
