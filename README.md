@@ -1,4 +1,4 @@
-```markdown
+markdown
 # DjangoNAUT
 
 > **Django Control Center** — a companion to your editor, not a replacement for your habits. Open it up to instantly see your model map, endpoint structure, live SQL queries, detect N+1 issues, and fix them with a single click.
