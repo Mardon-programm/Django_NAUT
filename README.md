@@ -1,140 +1,146 @@
+```markdown
 # DjangoNAUT
 
-> **Django Control Center** — дополнение к вашему редактору, а не замена привычкам. Открыли — увидели карту моделей, эндпоинтов, live SQL-запросы, поймали N+1 и исправили его одной кнопкой.
+> **Django Control Center** — a companion to your editor, not a replacement for your habits. Open it up to instantly see your model map, endpoint structure, live SQL queries, detect N+1 issues, and fix them with a single click.
 
-Полноценная среда разработки для Django на базе Electron: SQL-телеметрия в реальном времени с детекцией N+1 и **автофиксом**, 35+ инспекторов проекта, AI-ассистент, Enterprise-аудит со стоимостью техдолга. Плюс **CLI `djangonaut audit`** и **GitHub Action** — статический аудит в CI.
+A full-fledged Django development environment built on Electron: real-time SQL telemetry with N+1 detection and **auto-fixing**, 35+ project inspectors, an AI assistant, and an Enterprise audit panel with technical debt estimation. Plus the **`djangonaut audit` CLI** and a **GitHub Action** for static auditing in CI/CD pipelines.
 
 ![DjangoNAUT](logo.png)
 
-## Quick Start (30 секунд)
+## Quick Start (30 Seconds)
 
 ```bash
-# 1. Статический аудит — без GUI и без серверов, просто сканер
-npx djangonaut audit . --json          # или npm install -g djangonaut
+# 1. Static Audit — CLI scanner without GUI or background servers
+npx djangonaut audit . --json          # or npm install -g djangonaut
 
-# 2. SQL-телеметрия в реальном времени (опционально, в свой Django-проект)
+# 2. Real-time SQL Telemetry (optional, inside your Django project)
 pip install django-naut-agent
-#   добавить "django_naut" в INSTALLED_APPS и запустить: python manage.py runserver_naut
+#   add "django_naut" to INSTALLED_APPS and run: python manage.py runserver_naut
 
-# 3. Открыть десктопный Command Center
-npm install && npm start               # или готовый установщик
+# 3. Launch the Desktop Control Center
+npm install && npm start               # or use the pre-built installer
+
 ```
 
-За 5 секунд вы видите: карту моделей и эндпоинтов, живой терминал, каждый SQL-запрос со стеком вызова и N+1-детектор с кнопкой **Auto-fix**, которая сама впишет `select_related()` в нужный `views.py`.
+In 5 seconds, you get: a complete map of models and endpoints, an integrated live terminal, every SQL query with its full call stack, and an N+1 detector with an **Auto-fix** button that inserts `select_related()` directly into the appropriate `views.py`.
 
 ## Security & Privacy
 
-- **Всё локально.** И анализ, и телеметрия происходят на вашем компьютере. Никакие данные проекта не отправляются на серверы DjangoNAUT.
-- **Локальные серверы — только loopback.** Встроенные `terminal-server`, `log-server` и `telemetry-server` слушают исключительно `127.0.0.1` (смотрите исходники: `terminal-server.js:99`, `log-server.js:173`, `telemetry-server.js:28`). Снаружи они недоступны.
-- **CLI — вообще без серверов.** `djangonaut audit` — чистый статический сканер (Node), который ничего не слушает и ничего не отправляет. Можно запускать в CI.
-- **Проверка зависимостей уходит в PyPI/OSV** — это единственные внешние запросы, и только когда вы сами запустили аудит (отключается флагом `--no-deps`).
-- **AI-ассистент** отправляет запросы к провайдеру (GROQ/OpenAI) **только** если вы указали собственный API-ключ. Без ключа — ничего не уходит.
-- **Код открыт (MIT).** Любой может проверить, что делает приложение.
+* **100% Local.** Both static analysis and runtime telemetry run strictly on your local machine. No project data is ever transmitted to external DjangoNAUT servers.
+* **Loopback-Only Servers.** Built-in `terminal-server`, `log-server`, and `telemetry-server` bind strictly to `127.0.0.1` (see source code: `terminal-server.js:99`, `log-server.js:173`, `telemetry-server.js:28`). They are inaccessible from external networks.
+* **Zero-Server CLI.** The `djangonaut audit` CLI is a pure static Node.js scanner that listens to no ports and transmits no data. Safe for isolated CI/CD pipelines.
+* **Dependency Checks.** Dependency vulnerability lookups query PyPI/OSV APIs — these are the only external requests, triggered exclusively during manual audits (can be disabled via `--no-deps`).
+* **AI Assistant.** Sends requests to AI providers (GROQ/OpenAI) **only** if you configure your own API key. Without a key, no requests leave your machine.
+* **Open Source (MIT).** Anyone can audit the application codebase.
 
-## Возможности
+## Features
 
-### Инспекторы Django-проекта
+### Django Project Inspectors
 
-| Панель | Что делает |
+| Panel | Functionality |
 | --- | --- |
-| **Django** | Сводка по проекту: приложения, версия, настройки |
-| **URLs** | Таблица маршрутов с view-функциями и переходами по клику |
-| **ORM Models** | Модели, поля, связки, методы; просмотр данных |
-| **DB Explorer** | Подключения и таблицы выбранной БД |
-| **Templates** | Дерево шаблонов, наследование, block/extends |
-| **Forms** | Формы, поля, виджеты, валидаторы |
-| **Static** | Статические файлы по приложениям |
-| **ASGI** | ASGI-приложение, роутинг, middleware-цепочка |
-| **Settings & Env** | Настройки и `.env`; корректно различает `DEBUG = True` и env-переменные |
-| **Commands** | Management-команды с help, флагами `requires_system_checks`, `requires_migrations_checks` |
-| **Middleware** | Pipeline request→response, хуки, async-детекция |
-| **i18n** | Здоровье `.po`-каталогов, untranslated/fuzzy/obsolete, usage в шаблонах и коде, missing-строки |
-| **Admin** | Зарегистрированные ModelAdmin, опции, inlines, незарегистрированные админки |
-| **DRF** | Роутеры, viewsets, serializers, permission/pagination; **Send to API Client** — тестовые CRUD-эндпоинты под каждый роутер без Postman |
-| **Migration Guard** | Граф миграций, конфликты веток, автопочинка; проверка дрейфа моделей (`makemigrations --check`) |
+| **Django** | High-level project summary: installed apps, Django version, core settings |
+| **URLs** | Complete route table with mapped view functions and jump-to-code navigation |
+| **ORM Models** | Models, fields, relationships, methods, and built-in database record browser |
+| **DB Explorer** | Active connections and database tables for selected DB instances |
+| **Templates** | Template tree, inheritance map, and `block`/`extends` relationship structure |
+| **Forms** | Form and ModelForm fields, widgets, and validation routines |
+| **Static** | Static file tracking organized by application |
+| **ASGI** | ASGI application inspection, routing configuration, and middleware chain |
+| **Settings & Env** | Runtime configuration parser; accurately differentiates `DEBUG = True` from `.env` variables |
+| **Commands** | Management commands list with help text, `requires_system_checks`, and `requires_migrations_checks` flags |
+| **Middleware** | Request $\rightarrow$ Response pipeline order, execution hooks, and async detection |
+| **i18n** | Health monitoring for `.po` catalogs, untranslated/fuzzy/obsolete strings, template usage, and missing keys |
+| **Admin** | Registered `ModelAdmin` classes, options, inlines, and unregistered model detection |
+| **DRF** | Routers, ViewSets, Serializers, permissions, and pagination. Includes **Send to API Client** for quick CRUD endpoint testing without Postman |
+| **Migration Guard** | Visual migration graph, git branch conflict detection, auto-fix tools, and model drift checking (`makemigrations --check`) |
 
-### Отладка и производительность
+### Debugging & Performance
 
-| Панель | Что делает |
+| Panel | Functionality |
 | --- | --- |
-| **Requests** | SQL-телеметрия каждого запроса: время, стек вызова, **детекция N+1** с кнопкой **Auto-fix** — вставляет `select_related()` / `prefetch_related()` в queryset |
-| **Profiler** | Медленные запросы, сводки по времени |
-| **Logs** | Лог-сервер приложения |
-| **Cache** | Состояние кэша |
-| **Mail** | Перехват исходящих писем |
-| **Bug Hunter** | Статический анализ на баги с безопасными автофиксами: N+1, неиспользуемые импорты, `on_delete`, секреты, DEBUG |
-| **Tests** | Запуск тестов и просмотр результатов |
-| **Security** | Поиск уязвимостей: hardcoded секреты, SQL-инъекции, XSS, CSRF |
-| **Deps** | Устаревшие/уязвимые зависимости (PyPI + OSV) |
-| **Tasks** | Celery-задачи и их вызовы |
-| **Signals** | Приёмники сигналов, модели с побочными эффектами |
+| **Requests** | Real-time SQL telemetry per request: execution time, call stack, and **N+1 detection** with an **Auto-fix** button inserting `select_related()` / `prefetch_related()` into querysets |
+| **Profiler** | Slow query identification and execution timing breakdowns |
+| **Logs** | Centralized application log stream server |
+| **Cache** | Cache backend status, active keys, TTL inspection, and purge actions |
+| **Mail** | Interception of outgoing development emails captured as JSON payloads |
+| **Bug Hunter** | Static bug analysis with safe auto-fixes: N+1 issues, unused imports, missing `on_delete`, exposed secrets, and `DEBUG` leaks |
+| **Tests** | Integrated test runner and interactive test result viewer |
+| **Security** | Vulnerability scanning: hardcoded secrets, SQL injection vectors, XSS, and CSRF flaws |
+| **Deps** | Outdated or vulnerable dependency auditor using PyPI and OSV databases |
+| **Tasks** | Celery task inspection, call tracking, and execution statuses |
+| **Signals** | Signal receiver mapper, listener tracking, and side-effect detection |
 
-### Аудит проекта
+### Project Audit
 
-| Панель | Что делает |
+| Panel | Functionality |
 | --- | --- |
-| **Enterprise / Audit Report** | Health score, стоимость апгрейда (часы/дни), риск зависимостей; экспорт отчёта в markdown/HTML/PDF |
+| **Enterprise / Audit Report** | Comprehensive health score, upgrade complexity estimates (hours/days), dependency risk assessment, and report exports to Markdown, HTML, or PDF |
 
-### Инструменты разработчика
+### Developer Tools
 
-- **Терминал** — PTY встроенным в IDE
-- **AI-ассистент** — анализ проекта, архитектор, память, баг-хант, генерация тестов и мок-данных
-- **API Client** — отправка HTTP-запросов
-- **Docker** — управление контейнерами
-- **Deploy** — публикация проекта
-- **Search** — поиск по коду и проекту
+* **Terminal** — Embedded PTY shell directly inside the IDE
+* **AI Assistant** — Codebase analysis, architectural planning, project memory, bug hunting, test generation, and mock data population
+* **API Client** — Built-in HTTP client for API request testing
+* **Docker** — Container and image management
+* **Deploy** — Application deployment dashboard
+* **Search** — Global codebase and project-wide search
 
-## Установка и запуск
+## Installation & Setup
 
-Требования: Node.js 18+, Python 3.9+.
+System Requirements: Node.js 18+, Python 3.9+.
 
 ```bash
-git clone https://github.com/Mardon-programm/Django_NAUT.git
+git clone [https://github.com/Mardon-programm/Django_NAUT.git](https://github.com/Mardon-programm/Django_NAUT.git)
 cd Django_NAUT
 npm install
 npm start
+
 ```
 
-### Python-агент
+### Python Agent Setup
 
-Для SQL-телеметрии, перехвата ошибок и shell-режима установите агент в свой Django-проект:
+To enable real-time SQL telemetry, error interception, and interactive shell features, install the agent inside your Django environment:
 
 ```bash
-pip install -e ./python-agent   # из корня этого репозитория
+pip install -e ./python-agent   # Installed from repository root
+
 ```
 
-Затем добавьте `"django_naut"` в `INSTALLED_APPS` и запускайте dev-сервер через:
+Add `"django_naut"` to `INSTALLED_APPS` in your `settings.py`, then run the development server via:
 
 ```bash
 python manage.py runserver_naut --naut-port 9999
+
 ```
 
-Миддлварь `django_naut.middleware.DjangoNautMiddleware` собирает каждый SQL-запрос со стеком вызова и отправляет телеметрию в IDE. Можно добавить миддлю вручную в `MIDDLEWARE` и указать `DJANGONAUT_PORT` в `settings.py`.
+The middleware `django_naut.middleware.DjangoNautMiddleware` records every SQL query alongside its call stack and streams telemetry to the IDE. You can also add the middleware manually to `MIDDLEWARE` and define `DJANGONAUT_PORT` in `settings.py`.
 
 ## CLI: `djangonaut audit`
 
-Те же анализаторы, что в IDE, но из терминала — без GUI и без локальных серверов. Удобно для локальных проверок и CI.
+Run the exact same static analysis engines as the desktop IDE directly from your terminal — without a GUI or background servers. Ideal for local sanity checks and CI environments.
 
 ```bash
 npm install -g djangonaut
 djangonaut audit [folder] [options]
+
 ```
 
-| Флаг | Описание |
+| Flag | Description |
 | --- | --- |
-| `--json` | Вывести полный отчёт в JSON (`summary`, `issues`, `security`, `deps`, `report`) |
-| `--fail-on=<level>` | Порог падения: `critical`, `error` (по умолчанию), `warning`, `performance`, `info`, `none` (никогда не падать) |
-| `--min-severity=<level>` | Показывать только находки уровня не ниже указанного (человекочитаемый вывод) |
-| `--no-deps` | Не проверять зависимости (не требует сети) |
-| `--output=<path>` | Сохранить JSON-отчёт в файл |
-| `--markdown=<path>` | Сохранить markdown-отчёт в файл |
-| `--help`, `--version` | Справка и версия |
+| `--json` | Output complete audit report as structured JSON (`summary`, `issues`, `security`, `deps`, `report`) |
+| `--fail-on=<level>` | Failure threshold: `critical`, `error` (default), `warning`, `performance`, `info`, `none` (never fail) |
+| `--min-severity=<level>` | Display findings at or above the specified severity level (human-readable output) |
+| `--no-deps` | Skip dependency checks (runs fully offline) |
+| `--output=<path>` | Save JSON report to specified file path |
+| `--markdown=<path>` | Save Markdown report to specified file path |
+| `--help`, `--version` | Display help menu or version information |
 
-Exit-коды: `0` — замечаний выше порога нет, `1` — есть, `2` — фатальная ошибка (не Django-проект или битые аргументы).
+Exit Codes: `0` — No issues found above the specified failure threshold, `1` — Issues found exceeding threshold, `2` — Fatal error (non-Django directory or invalid arguments).
 
 ## GitHub Action
 
-Готовый reusable workflow для проверки Django-проекта на каждый push. Подключите в своём репозитории:
+A ready-to-use reusable workflow for auditing your Django repository on every code push. Include it in your GitHub repository:
 
 ```yaml
 name: DjangoNAUT Audit
@@ -145,30 +151,36 @@ jobs:
     with:
       project-path: .
       fail-on: error
+
 ```
 
-Параметры: `project-path`, `fail-on`, `min-severity`, `no-deps`, `node-version`, `json-report`, `markdown-report`, `cli-source`. Билд падает, если найдены проблемы выше порога; JSON и markdown-отчёты выкладываются артефактом.
+Parameters: `project-path`, `fail-on`, `min-severity`, `no-deps`, `node-version`, `json-report`, `markdown-report`, `cli-source`. Builds fail automatically if findings exceed the specified threshold, uploading JSON and Markdown audit reports as build artifacts.
 
-## Переход из VS Code
+## VS Code Migration Path
 
-DjangoNAUT снижает стоимость перехода в четыре шага:
+DjangoNAUT minimizes switching friction in four steps:
 
-1. **Импорт настроек** — Settings → «Import from VS Code…»: тянет тему (Dark+/Monokai/Dracula/…), шрифт, tab size, word wrap, minimap и горячие клавиши (`keybindings.json`) из пользовательских настроек и `.vscode/` проекта. Ничего не меняется без подтверждения.
-2. **First-run onboarding** — при первом запуске: welcome-экран с фичами, а после открытия проекта — автоматический прогон Bug Hunter с тостом «Found N issues».
-3. **Companion-расширение** (`vscode-extension/`) — команда «DjangoNAUT: Open Project» запускает приложение с текущей папкой (`--open <folder>`); повторный запуск фокусирует существующее окно. Сборка: `npx @vscode/vsce package`.
-4. **Editor-паритет** — Ctrl+D (add selection to next match), мультикурсор, Ctrl+/, Alt+↑/↓ работают как в VS Code; **Emmet-lite** (Ctrl+E: `div#app>span*3` → разметка), **Format on Save** (black → autopep8 → yapf) и **Format Document** (Shift+Alt+F).
+1. **Settings Import** — Settings $\rightarrow$ "Import from VS Code...": pulls your theme (*Dark+*, *Monokai*, *Dracula*, etc.), font configurations, tab size, word wrapping, minimap settings, and custom keybindings (`keybindings.json`) directly from VS Code user profiles or project `.vscode/` folders. Nothing changes without user confirmation.
+2. **First-Run Onboarding** — A welcome screen introduces core capabilities on first launch. Opening a project automatically triggers a Bug Hunter scan with an actionable toast notification ("Found N issues").
+3. **Companion Extension** (`vscode-extension/`) — Adds the "DjangoNAUT: Open Project" command to VS Code, launching DjangoNAUT targeting the current workspace (`--open <folder>`). Re-triggering focuses the existing window. Build via `npx @vscode/vsce package`.
+4. **Editor Parity** — `Ctrl+D` (add selection to next match), multi-cursor editing, `Ctrl+/`, and `Alt+Up/Down` work natively as in VS Code. Includes **Emmet-lite** (`Ctrl+E`: expands `div#app>span*3` into markup), **Format on Save** (`black` $\rightarrow$ `autopep8` $\rightarrow$ `yapf`), and **Format Document** (`Shift+Alt+F`).
 
-## Тесты
+## Test Suite
 
 ```bash
-npm test   # 65/65 PASS: синтаксис, Bug Hunter, CLI, миграции, N+1 (в т.ч. автофикс), python-agent, wiring, VS Code import, Emmet, formatting
+npm test   # 65/65 PASS: syntax, Bug Hunter, CLI, migrations, N+1 (including auto-fix), python-agent, wiring, VS Code import, Emmet, formatting
+
 ```
 
-## Сборка
+## Build Targets
 
-- **Linux / macOS** — см. [BUILD.md](BUILD.md)
-- **Windows**: `npm run build` (NSIS-инсталлятор + portable)
+* **Linux / macOS** — See [BUILD.md](BUILD.md)
+* **Windows**: `npm run build` (NSIS installer + portable binaries)
 
-## Лицензия
+## License
 
 MIT
+
+```
+
+```
